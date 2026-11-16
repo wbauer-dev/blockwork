@@ -92,3 +92,30 @@ class FtmsControlPointTest {
         assertThat(FtmsControlPoint.parseResponse(bytes(0x05, 0x18, 0x01))).isNull()
     }
 }
+
+class FtmsCapabilitiesParserTest {
+
+    @Test fun feature() {
+        // machine: cadence (bit1) + power measurement (bit14) = 0x4002; targets: power (bit3) = 0x08
+        val f = FtmsCapabilitiesParser.parseFeature(bytes(0x02, 0x40, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00))!!
+        assertThat(f.cadenceSupported).isTrue()
+        assertThat(f.powerMeasurementSupported).isTrue()
+        assertThat(f.powerTargetSupported).isTrue()
+        assertThat(f.featureRawHex).isEqualTo("02 40 00 00 08 00 00 00")
+    }
+
+    @Test fun featureWithoutPowerTarget() {
+        val f = FtmsCapabilitiesParser.parseFeature(bytes(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00))!!
+        assertThat(f.powerTargetSupported).isFalse()
+        assertThat(FtmsCapabilitiesParser.parseFeature(bytes(0x00, 0x00))).isNull()
+    }
+
+    @Test fun powerRange() {
+        // min 0, max 1500 (0x05DC), increment 1
+        val r = FtmsCapabilitiesParser.parsePowerRange(bytes(0x00, 0x00, 0xDC, 0x05, 0x01, 0x00))!!
+        assertThat(r.minWatts).isEqualTo(0)
+        assertThat(r.maxWatts).isEqualTo(1500)
+        assertThat(r.incrementWatts).isEqualTo(1)
+        assertThat(r.clamp(2000)).isEqualTo(1500)
+    }
+}

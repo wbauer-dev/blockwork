@@ -16,5 +16,3 @@ data class BikeSample(
     val speedKmh: Double? = null,
     val totalDistanceMeters: Int? = null,
 )
-
-enum class ConnectionState { Disconnected, Connecting, Connected }
