@@ -360,14 +360,16 @@ private fun ChartsPage(s: SessionState, maxHeartRate: Int?, modifier: Modifier) 
                 tint = powerTint(s),
                 valueSize = CompactValue,
             )
+            // Narrow tiles: units go under the number, "107 bpm" does not fit on one line.
             Tile(
                 if (zone != null) "HR · Z${zone.number}" else "HR",
-                s.heartRateBpm?.toString(), "bpm",
+                s.heartRateBpm?.toString(), "",
                 modifier = cell.weight(1f),
+                footer = "bpm",
                 tint = zone?.color(),
                 valueSize = CompactValue,
             )
-            Tile("Cadence", s.cadenceRpm?.toString(), "rpm", modifier = cell.weight(1f), valueSize = CompactValue)
+            Tile("Cadence", s.cadenceRpm?.toString(), "", modifier = cell.weight(1f), footer = "rpm", valueSize = CompactValue)
             Tile(
                 s.currentStep.label ?: "Interval",
                 formatDuration(s.stepRemainingSec), "",
