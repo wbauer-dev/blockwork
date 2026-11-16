@@ -1,6 +1,6 @@
 # Indoor Cycling App – Project Plan
 
-Status: draft v1 · 2026-11-16 · Phase 0–2 done · Phase 3 implemented, device test pending
+Status: draft v1 · 2026-11-16 · Phase 0–3 done · Phase 4 implemented (without Strava API), device test pending
 
 ## 1. Goal & scope
 
@@ -17,12 +17,12 @@ An Android app for structured indoor cycling. It runs on a phone and controls a 
 | Trainer | Wahoo KICKR Core over FTMS, **ERG mode only** |
 | Cadence | Taken from the KICKR Core only (no separate sensor) |
 | Training plans | Rule-based generator, plus import of workouts and plans |
-| Export | Strava (FIT upload); also a manual FIT export through the share sheet |
+| Export | FIT export through the share sheet; manual upload to Strava/Garmin/intervals.icu. Strava API dropped (access requires a subscription) – parked on branch `feature/strava-upload` |
 
 ### Out of scope (for now)
 - Slope/resistance simulation, virtual routes, multiplayer
 - ANT+, other trainers or sensors (the architecture still allows adding them)
-- Cloud accounts or sync, except Strava
+- Cloud accounts, sync or any network access
 - iOS, Wear OS
 
 ## 2. Tech stack
@@ -34,7 +34,6 @@ An Android app for structured indoor cycling. It runs on a phone and controls a 
 - **Nordic Android BLE library** for the GATT layer
 - **Vico** for charts (workout profile, ride graphs)
 - **Garmin FIT SDK (Java)** for FIT export
-- **Ktor client** or OkHttp for the Strava API; **Custom Tabs** for the OAuth login
 - Gradle with Kotlin DSL and a version catalog. Use the latest stable AGP, Kotlin and Compose BOM when the project is created
 - `minSdk 31` (Android 12, which has the modern Bluetooth permissions), `targetSdk`/`compileSdk` = latest stable (37)
 
@@ -50,7 +49,7 @@ An Android app for structured indoor cycling. It runs on a phone and controls a 
 │ DeviceScanner               │ │ Room DB (workouts, plans,   │
 │ HeartRateSensor (0x180D)    │ │   rides, samples)           │
 │ FtmsTrainer (0x1826)        │ │ Settings (DataStore)        │
-│ Simulated devices (dev/test)│ │ FIT export · Strava client  │
+│ Simulated devices (dev/test)│ │ FIT export                  │
 └──────────────┬──────────────┘ └──────────────┬──────────────┘
                │                               │
 ┌──────────────┴───────── :domain (pure Kotlin/JVM) ───────────┐
@@ -135,16 +134,13 @@ Import works through the Android file picker and "Open with / Share to app". Imp
 
 **Plan view:** a calendar or week list with "today's workout". Completed rides are linked to their planned session.
 
-### 3.6 History & Strava
+### 3.6 History & export
 
-- Ride list and detail view: graphs, averages, normalized power, time in zones, average and max HR
-- **FIT export:** FileId, Activity, Session (sport cycling, sub-sport indoor cycling), one Lap per segment, Record messages at 1 Hz
-- **Strava:**
-  - OAuth2 through Custom Tabs with the scope `activity:write`; tokens stored encrypted; automatic token refresh
-  - `POST /api/v3/uploads` (FIT file, `trainer=1`), then poll the upload status
-  - Personal use: register your own Strava API app (it starts with a 1-athlete limit, which is enough)
-  - Play Store later: the client secret must not ship in the APK, which requires a small token-exchange backend
-- Fallback that always works: "Share FIT file" through the Android share sheet
+- Ride list and detail view: power/target and heart-rate charts, averages, normalized power, IF, TSS, average and max HR
+- **FIT export:** FileId, Activity, Session (sport cycling, sub-sport indoor cycling), one Lap per segment, Record messages at 1 Hz, shared through the Android share sheet
+- Upload to Strava, Garmin Connect or intervals.icu is done manually with the exported file
+- **Strava API: dropped** (API access requires a subscription). The implementation (OAuth, Keystore-encrypted tokens, upload with polling) is parked on branch `feature/strava-upload`
+- The app needs no network access
 
 ## 4. Phases & milestones
 
@@ -179,10 +175,11 @@ Import works through the Android file picker and "Open with / Share to app". Imp
 - Ramp FTP test workout with result evaluation
 - Note: whole-plan JSON import moved to Phase 5 (together with the plan model); Phase 3 imports single workouts. "Open with / Share to app" is not done yet; import works through the file picker.
 
-### Phase 4 – History & Strava
-- Ride history and ride detail with metrics
-- FIT export + share sheet
-- Strava OAuth + upload (automatic after a ride, as an option)
+### Phase 4 – History & export
+- Ride history and ride detail with metrics and charts
+- Recovery of rides interrupted by an app kill
+- FIT export + share sheet (manual upload to Strava, Garmin Connect, intervals.icu)
+- ~~Strava OAuth + upload~~ – dropped: Strava API access requires a subscription. The finished implementation is parked on branch `feature/strava-upload`.
 
 ### Phase 5 – Plan generator
 - Template library, rule engine, generator unit tests
@@ -191,7 +188,7 @@ Import works through the Android file picker and "Open with / Share to app". Imp
 
 ### Phase 6 – Polish / Play Store prep (when needed)
 - Onboarding, landscape layout, settings (zones, cues, units), dark theme fine-tuning
-- Play Store: privacy policy, Data Safety form (heart rate counts as **health data**), Strava token backend, signing, crash reporting without personal data
+- Play Store: privacy policy, Data Safety form (heart rate counts as **health data**), signing, crash reporting without personal data
 
 ## 5. Testing strategy
 
@@ -201,7 +198,7 @@ Import works through the Android file picker and "Open with / Share to app". Imp
 
 ## 6. Data protection
 
-- All ride and heart-rate data stays on the phone. Strava gets only what the user explicitly uploads.
+- All ride and heart-rate data stays on the phone (the app has no network access). It only leaves the phone as a FIT file the user explicitly exports.
 - Heart-rate data is health data (Art. 9 GDPR). During development, use **simulated or synthetic data only** for tests, sample files and AI-assisted work, and never paste real ride recordings or HR exports into prompts.
 
 ## 7. Risks & open points
@@ -212,4 +209,3 @@ Import works through the Android file picker and "Open with / Share to app". Imp
 | H9 blocked by another connection (watch/app) | Clear error message, note in onboarding |
 | Android background/BLE restrictions on Android 17 | Foreground service from Phase 2; test the screen-off case early |
 | ERG at low cadence (spiral of death) | Ramp the target smoothly; "ERG off/pause" button |
-| Strava client secret for a Play Store release | Personal: in local, uncommitted config; store: token backend |

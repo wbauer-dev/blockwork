@@ -78,4 +78,5 @@ class TrainingController @Inject constructor(
         cueJob?.cancel()
         session.value = null
     }
+
 }

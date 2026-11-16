@@ -27,6 +27,11 @@ data class RideEntity(
     val intensityFactor: Double? = null,
     val tss: Int? = null,
     val distanceMeters: Int? = null,
+    // Unused since the Strava upload was dropped (see branch feature/strava-upload).
+    // Kept so existing v3 databases need no destructive migration.
+    val stravaUploadId: Long? = null,
+    val stravaActivityId: Long? = null,
+    val stravaError: String? = null,
 )
 
 @Entity(

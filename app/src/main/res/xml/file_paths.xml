@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- FIT exports for the share sheet; recreated on demand, cache only. -->
+    <cache-path name="exports" path="exports/" />
+</paths>

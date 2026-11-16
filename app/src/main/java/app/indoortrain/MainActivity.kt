@@ -22,6 +22,8 @@ import app.indoortrain.ui.settings.SettingsScreen
 import app.indoortrain.ui.theme.IndoorTrainTheme
 import app.indoortrain.ui.training.TrainingScreen
 import app.indoortrain.ui.editor.WorkoutEditorScreen
+import app.indoortrain.ui.history.HistoryScreen
+import app.indoortrain.ui.history.RideDetailScreen
 import app.indoortrain.ui.workouts.WorkoutDetailScreen
 import app.indoortrain.ui.workouts.WorkoutListScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -60,6 +62,7 @@ class MainActivity : ComponentActivity() {
                             onOpenSettings = { nav.navigate(Routes.SETTINGS) },
                             onOpenWorkouts = { nav.navigate(Routes.WORKOUTS) },
                             onOpenTraining = { nav.navigate(Routes.TRAINING) { launchSingleTop = true } },
+                            onOpenHistory = { nav.navigate(Routes.HISTORY) },
                         )
                     }
                     composable(Routes.DEVICES) { DevicesScreen(onBack = { nav.popBackStack() }) }
@@ -95,6 +98,12 @@ class MainActivity : ComponentActivity() {
                             },
                         )
                     }
+                    composable(Routes.HISTORY) {
+                        HistoryScreen(onBack = { nav.popBackStack() }, onOpen = { id -> nav.navigate("ride/$id") })
+                    }
+                    composable(Routes.RIDE, arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+                        RideDetailScreen(onBack = { nav.popBackStack() })
+                    }
                     composable(Routes.TRAINING) {
                         TrainingScreen(
                             onBack = { nav.popBackStack(Routes.LIVE, inclusive = false) },
@@ -127,6 +136,8 @@ class MainActivity : ComponentActivity() {
         const val SETTINGS = "settings"
         const val WORKOUTS = "workouts"
         const val TRAINING = "training"
+        const val HISTORY = "history"
+        const val RIDE = "ride/{id}"
         const val WORKOUT = "workout/{id}"
         const val EDITOR = "editor?id={id}&copy={copy}"
 

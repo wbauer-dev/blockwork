@@ -27,6 +27,7 @@ dependencies {
     api(project(":domain"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.datastore.preferences)
+    implementation(libs.garmin.fit)
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
     implementation(libs.hilt.android)
@@ -34,4 +35,5 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.truth)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

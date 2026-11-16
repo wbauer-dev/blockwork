@@ -1,7 +1,7 @@
 # IndoorTrain
 
 Android app for structured indoor cycling: Polar H9 (BLE Heart Rate Service) + Wahoo KICKR Core (FTMS, ERG mode only),
-interval workouts, rule-based plan generator, workout import, Strava export. See [PLAN.md](PLAN.md) for scope and phases.
+interval workouts, rule-based plan generator, workout import, FIT export. No network access (no INTERNET permission). See [PLAN.md](PLAN.md) for scope and phases.
 
 ## Build & test
 - `./gradlew test` – all JVM unit tests (domain + ble parsers)
@@ -11,7 +11,7 @@ interval workouts, rule-based plan generator, workout import, Strava export. See
 ## Modules
 - `:domain` – pure Kotlin/JVM (no Android). Workout model, engine, zones, plan generator, importers. Put logic here.
 - `:ble` – BLE devices (Nordic BLE library), GATT UUIDs, byte parsers/encoders (pure, unit-tested).
-- `:data` – persistence (DataStore, later Room), FIT export, Strava client.
+- `:data` – persistence (DataStore, Room with exported schemas + auto-migrations), FIT export (Garmin FIT SDK).
 - `:app` – Compose UI, ViewModels, Hilt wiring, foreground TrainingService.
 
 ## Conventions

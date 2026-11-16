@@ -21,6 +21,9 @@ interface RideDao {
     @Query("SELECT * FROM rides ORDER BY startedAt DESC")
     fun observeRides(): Flow<List<RideEntity>>
 
+    @Query("SELECT * FROM rides WHERE id = :id")
+    fun observeRide(id: Long): Flow<RideEntity?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSample(sample: RideSampleEntity)
 
