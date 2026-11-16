@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -132,6 +133,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val ergResult by viewModel.ergResult.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var showAbout by remember { mutableStateOf(false) }
     fun notify(message: String) {
         scope.launch {
             snackbar.currentSnackbarData?.dismiss()
@@ -146,6 +148,9 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                },
+                actions = {
+                    IconButton(onClick = { showAbout = true }) { Icon(Icons.Outlined.Info, "About IndoorTrain") }
                 },
             )
         },
@@ -194,6 +199,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             DiagnosticsCard("Heart rate monitor", hrStatus, null)
         }
     }
+    if (showAbout) AboutDialog(onDismiss = { showAbout = false })
 }
 
 @Composable

@@ -1,3 +1,10 @@
+import com.android.build.api.variant.BuildConfigField
+import java.io.ByteArrayOutputStream
+import java.time.LocalDate
+import java.time.ZoneOffset
+import javax.inject.Inject
+import org.gradle.process.ExecOperations
+
 // Release version: CI passes -PappVersionName=1.2.3 -PappVersionCode=10203 (derived from the git tag).
 val appVersionName = providers.gradleProperty("appVersionName").getOrElse("0.0.0-dev")
 val appVersionCode = providers.gradleProperty("appVersionCode").map(String::toInt).getOrElse(1)
@@ -59,6 +66,51 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+}
+
+// Shown in Settings → About. Value sources run on every build, so the configuration cache does not
+// freeze them. The date has no time of day: a timestamp would regenerate BuildConfig on every build.
+abstract class GitCommitSource : ValueSource<String, GitCommitSource.Params> {
+    interface Params : ValueSourceParameters {
+        val repoDir: Property<String>
+    }
+
+    @get:Inject abstract val exec: ExecOperations
+
+    private fun git(vararg args: String): String? = try {
+        val out = ByteArrayOutputStream()
+        val result = exec.exec {
+            commandLine(listOf("git", "-C", parameters.repoDir.get()) + args)
+            standardOutput = out
+            errorOutput = ByteArrayOutputStream()
+            isIgnoreExitValue = true
+        }
+        if (result.exitValue == 0) out.toString().trim() else null
+    } catch (e: Exception) {
+        null // no git installed
+    }
+
+    /** "47f6244ac0", "47f6244ac0-dirty" with uncommitted changes to tracked files, "unknown" outside a repo. */
+    override fun obtain(): String {
+        val hash = git("rev-parse", "--short=10", "HEAD") ?: return "unknown"
+        val dirty = !git("status", "--porcelain", "--untracked-files=no").isNullOrEmpty()
+        return if (dirty) "$hash-dirty" else hash
+    }
+}
+
+abstract class BuildDateSource : ValueSource<String, ValueSourceParameters.None> {
+    override fun obtain(): String = LocalDate.now(ZoneOffset.UTC).toString()
+}
+
+val gitCommit = providers.of(GitCommitSource::class) { parameters.repoDir.set(rootDir.absolutePath) }
+val buildDate = providers.of(BuildDateSource::class) {}
+
+androidComponents {
+    onVariants { variant ->
+        variant.buildConfigFields?.put("GIT_COMMIT", gitCommit.map { BuildConfigField("String", "\"$it\"", "Built commit") })
+        variant.buildConfigFields?.put("BUILD_DATE", buildDate.map { BuildConfigField("String", "\"$it\"", "Build date (UTC)") })
     }
 }
 
