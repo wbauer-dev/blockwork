@@ -1,5 +1,6 @@
 package app.indoortrain.domain.training
 
+import app.indoortrain.domain.BikeSample
 import app.indoortrain.domain.Segment
 import app.indoortrain.domain.Workout
 import app.indoortrain.domain.sim.SimulatedHeartRateMonitor
@@ -16,8 +17,13 @@ import kotlin.random.Random
 private class FakeRecorder : RideRecorder {
     val samples = mutableListOf<RideSample>()
     var finished: Pair<RideSummary, Boolean>? = null
+    var started: RideStart? = null
 
-    override suspend fun startRide(start: RideStart) = 1L
+    override suspend fun startRide(start: RideStart): Long {
+        check(started == null) { "ride started twice" }
+        started = start
+        return 1L
+    }
     override suspend fun addSample(rideId: Long, sample: RideSample) { samples += sample }
     override suspend fun finishRide(rideId: Long, summary: RideSummary, completed: Boolean) {
         finished = summary to completed
@@ -134,5 +140,156 @@ class FreeRideSessionTest {
         assertThat(trainer.targetWatts.value).isEqualTo(200)
         session.stop()
         advanceTimeBy(2_000)
+    }
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class AutoStartPauseSessionTest {
+    private val workout = Workout(
+        "auto", "Auto start test",
+        segments = listOf(Segment.Steady(60, 0.5), Segment.Steady(60, 1.0)),
+    )
+
+    private class Rig(scope: TestScope, workout: Workout, autoStart: Boolean, autoPause: Boolean) {
+        val trainer = SimulatedSmartTrainer(scope.backgroundScope, Random(5))
+        val hr = SimulatedHeartRateMonitor(scope.backgroundScope, Random(5)) { trainer.bikeData.value?.powerWatts }
+        val recorder = FakeRecorder()
+        val session = TrainingSession(
+            workout, ftp = 200, trainer, hr, recorder, scope.backgroundScope,
+            timeSource = scope.testScheduler.timeSource, wallClock = { scope.testScheduler.currentTime },
+            autoStart = autoStart, autoPause = autoPause,
+        )
+        val state get() = session.state.value
+    }
+
+    @Test fun autoStartWaitsForPedalingThenStartsRide() = runTest {
+        val rig = Rig(this, workout, autoStart = true, autoPause = false)
+        rig.trainer.pedaling = false
+        rig.trainer.connect("SIM")
+        rig.session.start()
+        advanceTimeBy(10_000)
+        assertThat(rig.state.phase).isEqualTo(SessionPhase.Ready)
+        assertThat(rig.state.waitingForPedaling).isTrue()
+        assertThat(rig.state.elapsedSec).isEqualTo(0)
+        assertThat(rig.recorder.started).isNull()
+        assertThat(rig.recorder.samples).isEmpty()
+        assertThat(rig.trainer.targetWatts.value).isNull() // no ERG while waiting
+
+        rig.trainer.pedaling = true
+        advanceTimeBy(2_500)
+        assertThat(rig.state.phase).isEqualTo(SessionPhase.Running)
+        assertThat(rig.state.waitingForPedaling).isFalse()
+        assertThat(rig.recorder.started!!.startedAtMillis).isAtLeast(10_000L)
+        assertThat(rig.trainer.targetWatts.value).isEqualTo(100)
+        assertThat(rig.state.elapsedSec).isAtMost(2)
+        rig.session.stop()
+        advanceTimeBy(2_000)
+    }
+
+    @Test fun resumeStartsWaitingWorkoutByHand() = runTest {
+        val rig = Rig(this, workout, autoStart = true, autoPause = false)
+        rig.trainer.pedaling = false
+        rig.trainer.connect("SIM")
+        rig.session.start()
+        advanceTimeBy(3_000)
+        rig.session.resume()
+        runCurrent()
+        assertThat(rig.state.phase).isEqualTo(SessionPhase.Running)
+        assertThat(rig.recorder.started).isNotNull()
+        rig.session.stop()
+        advanceTimeBy(2_000)
+    }
+
+    @Test fun stopWhileWaitingRecordsNothing() = runTest {
+        val rig = Rig(this, workout, autoStart = true, autoPause = false)
+        rig.trainer.pedaling = false
+        rig.trainer.connect("SIM")
+        rig.session.start()
+        advanceTimeBy(3_000)
+        rig.session.stop()
+        advanceTimeBy(2_000)
+        assertThat(rig.state.phase).isEqualTo(SessionPhase.Finished)
+        assertThat(rig.state.rideId).isNull()
+        assertThat(rig.recorder.started).isNull()
+        assertThat(rig.recorder.finished).isNull()
+    }
+
+    @Test fun withoutAutoStartRunsImmediatelyEvenWhenNotPedaling() = runTest {
+        val rig = Rig(this, workout, autoStart = false, autoPause = false)
+        rig.trainer.pedaling = false
+        rig.trainer.connect("SIM")
+        rig.session.start()
+        advanceTimeBy(10_000)
+        runCurrent()
+        assertThat(rig.state.phase).isEqualTo(SessionPhase.Running)
+        assertThat(rig.state.elapsedSec).isEqualTo(10)
+        rig.session.stop()
+        advanceTimeBy(2_000)
+    }
+
+    @Test fun autoPausesWhenPedalingStopsAndResumesWhenItStarts() = runTest {
+        val rig = Rig(this, workout, autoStart = false, autoPause = true)
+        rig.trainer.connect("SIM")
+        rig.session.start()
+        advanceTimeBy(10_000)
+        assertThat(rig.state.phase).isEqualTo(SessionPhase.Running)
+
+        rig.trainer.pedaling = false
+        advanceTimeBy(6_000)
+        assertThat(rig.state.phase).isEqualTo(SessionPhase.Paused)
+        assertThat(rig.state.autoPaused).isTrue()
+        val pausedAt = rig.state.elapsedSec
+        // pedaling stopped at ~9 s; three idle ticks later the clock stops
+        assertThat(pausedAt).isIn(11..13)
+        assertThat(rig.trainer.targetWatts.value).isEqualTo(80) // easy pause resistance
+
+        advanceTimeBy(20_000)
+        assertThat(rig.state.elapsedSec).isEqualTo(pausedAt) // clock stands still
+
+        rig.trainer.pedaling = true
+        advanceTimeBy(2_500)
+        assertThat(rig.state.phase).isEqualTo(SessionPhase.Running)
+        assertThat(rig.state.autoPaused).isFalse()
+        assertThat(rig.trainer.targetWatts.value).isEqualTo(100)
+        rig.session.stop()
+        advanceTimeBy(2_000)
+    }
+
+    @Test fun manualPauseIsNotResumedByPedaling() = runTest {
+        val rig = Rig(this, workout, autoStart = true, autoPause = true)
+        rig.trainer.connect("SIM")
+        rig.session.start()
+        advanceTimeBy(5_000)
+        assertThat(rig.state.phase).isEqualTo(SessionPhase.Running)
+        rig.session.pause()
+        advanceTimeBy(10_000) // still pedaling
+        assertThat(rig.state.phase).isEqualTo(SessionPhase.Paused)
+        assertThat(rig.state.autoPaused).isFalse()
+        rig.session.stop()
+        advanceTimeBy(2_000)
+    }
+
+    @Test fun noAutoPauseWhileTrainerDisconnected() = runTest {
+        val rig = Rig(this, workout, autoStart = false, autoPause = true)
+        rig.trainer.connect("SIM")
+        rig.session.start()
+        advanceTimeBy(3_000)
+        rig.trainer.disconnect()
+        advanceTimeBy(10_000)
+        assertThat(rig.state.phase).isEqualTo(SessionPhase.Running)
+        rig.session.stop()
+        advanceTimeBy(2_000)
+    }
+}
+
+class PedalingTest {
+    @Test fun detectsFromCadenceThenPower() {
+        assertThat(Pedaling.detect(null)).isNull()
+        assertThat(Pedaling.detect(BikeSample())).isNull()
+        assertThat(Pedaling.detect(BikeSample(powerWatts = 0, cadenceRpm = 85.5))).isTrue()
+        assertThat(Pedaling.detect(BikeSample(powerWatts = 150, cadenceRpm = 0.0))).isFalse()
+        assertThat(Pedaling.detect(BikeSample(cadenceRpm = 19.5))).isFalse()
+        assertThat(Pedaling.detect(BikeSample(powerWatts = 120))).isTrue()
+        assertThat(Pedaling.detect(BikeSample(powerWatts = 5))).isFalse()
     }
 }

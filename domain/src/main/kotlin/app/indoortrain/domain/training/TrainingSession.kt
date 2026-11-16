@@ -1,5 +1,6 @@
 package app.indoortrain.domain.training
 
+import app.indoortrain.domain.BikeSample
 import app.indoortrain.domain.Step
 import app.indoortrain.domain.Workout
 import app.indoortrain.domain.devices.ConnectionState
@@ -74,6 +75,10 @@ data class SessionState(
     val heartRateHistory: List<Int?>,
     val summary: RideSummary?,
     val completed: Boolean,
+    /** Auto start is on and the rider has not started pedaling yet (phase [SessionPhase.Ready]). */
+    val waitingForPedaling: Boolean = false,
+    /** Paused because the rider stopped pedaling; pedaling again resumes. */
+    val autoPaused: Boolean = false,
 ) {
     val currentStep: Step get() = steps[stepIndex]
     val nextStep: Step? get() = steps.getOrNull(stepIndex + 1)
@@ -82,6 +87,11 @@ data class SessionState(
 /**
  * Runs one workout: ticks the [WorkoutEngine] once per second, sends ERG targets to the
  * trainer, records samples and publishes [state] and [cues].
+ *
+ * With [autoStart] the workout (and the ride recording) only begins once the rider pedals;
+ * [resume] starts it by hand. With [autoPause] it pauses after [Pedaling.AUTO_PAUSE_AFTER_SEC]
+ * seconds without pedaling and resumes as soon as the rider pedals again. A pause the rider
+ * chose is never resumed automatically.
  */
 class TrainingSession(
     private val workout: Workout,
@@ -93,6 +103,8 @@ class TrainingSession(
     private val timeSource: TimeSource = TimeSource.Monotonic,
     private val wallClock: () -> Long = System::currentTimeMillis,
     private val plannedSessionId: String? = null,
+    private val autoStart: Boolean = false,
+    private val autoPause: Boolean = false,
 ) {
     private val engine = WorkoutEngine(workout, ftp)
     private val mutex = Mutex()
@@ -107,6 +119,8 @@ class TrainingSession(
     private var controlProblem: ControlResult? = null
     private var summary: RideSummary? = null
     private var job: Job? = null
+    private var autoPaused = false
+    private var notPedalingSec = 0
 
     private val _state = MutableStateFlow(snapshot())
     val state: StateFlow<SessionState> = _state.asStateFlow()
@@ -117,9 +131,8 @@ class TrainingSession(
     fun start() {
         if (job != null) return
         job = scope.launch {
-            rideId = recorder.startRide(RideStart(wallClock(), workout.id, workout.name, ftp, plannedSessionId, workout.isFtpTest))
             mutex.withLock {
-                handle(engine.start())
+                if (!autoStart) begin()
                 updateTarget()
                 publish()
             }
@@ -136,8 +149,18 @@ class TrainingSession(
         }
     }
 
-    fun pause() = command { engine.pause() }
-    fun resume() = command { engine.resume() }
+    fun pause() = command {
+        engine.pause()
+        autoPaused = false
+    }
+
+    /** Resumes a pause, or starts a workout that is waiting for the rider to pedal. */
+    fun resume() = command {
+        if (engine.phase == SessionPhase.Ready) begin() else engine.resume()
+        autoPaused = false
+        notPedalingSec = 0
+    }
+
     fun skipStep() = command { handle(engine.skipStep()) }
     fun extendStep(seconds: Int = 60) = command { engine.extendStep(seconds) }
     fun increaseIntensity() = command { engine.adjustIntensity(WorkoutEngine.INTENSITY_STEP) }
@@ -180,9 +203,39 @@ class TrainingSession(
             rideId?.let { recorder.addSample(it, sample) }
         }
         handle(events)
+        autoStartPause(bike)
         updateTarget()
         publish()
         return engine.phase == SessionPhase.Finished
+    }
+
+    /** Starts the ride and the engine; the ride's start time is when the rider actually begins. */
+    private suspend fun begin() {
+        if (engine.phase != SessionPhase.Ready) return
+        rideId = recorder.startRide(RideStart(wallClock(), workout.id, workout.name, ftp, plannedSessionId, workout.isFtpTest))
+        handle(engine.start())
+    }
+
+    /** Runs after the tick, so a workout started here gets its first full second on the next tick. */
+    private suspend fun autoStartPause(bike: BikeSample?) {
+        // No data (e.g. trainer disconnected): keep the current phase.
+        val pedaling = Pedaling.detect(bike) ?: return
+        when (engine.phase) {
+            SessionPhase.Ready -> if (autoStart && pedaling) begin()
+            SessionPhase.Running -> if (autoPause) {
+                notPedalingSec = if (pedaling) 0 else notPedalingSec + 1
+                if (notPedalingSec >= Pedaling.AUTO_PAUSE_AFTER_SEC) {
+                    engine.pause()
+                    autoPaused = true
+                    notPedalingSec = 0
+                }
+            }
+            SessionPhase.Paused -> if (autoPaused && pedaling) {
+                engine.resume()
+                autoPaused = false
+            }
+            SessionPhase.Finished -> Unit
+        }
     }
 
     private fun handle(events: List<EngineEvent>) {
@@ -273,6 +326,8 @@ class TrainingSession(
             heartRateHistory = samples.map { it.heartRateBpm },
             summary = summary,
             completed = engine.completed,
+            waitingForPedaling = autoStart && engine.phase == SessionPhase.Ready,
+            autoPaused = autoPaused && engine.phase == SessionPhase.Paused,
         )
     }
 }

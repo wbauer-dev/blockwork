@@ -162,6 +162,16 @@ fun TrainingScreen(onBack: () -> Unit, onDone: () -> Unit, viewModel: TrainingVi
                 Text("No workout running.")
                 Button(onClick = onDone) { Text("Back") }
             }
+            // Ended while still waiting for the rider to pedal: no ride was recorded.
+            s.phase == SessionPhase.Finished && s.rideId == null && s.elapsedSec == 0 -> Column(
+                content,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Header(s.workoutName, null, onBack)
+                Text("Workout cancelled", style = MaterialTheme.typography.headlineMedium)
+                Text("You did not start pedaling, so nothing was recorded.")
+                Button(onClick = { c.dismiss(); onDone() }, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+            }
             s.phase == SessionPhase.Finished -> Column(
                 content.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -183,12 +193,13 @@ fun TrainingScreen(onBack: () -> Unit, onDone: () -> Unit, viewModel: TrainingVi
                 modifier = content,
                 onBack = onBack,
                 onPageChange = viewModel::setPage,
-                onPauseResume = { if (s.phase == SessionPhase.Paused) c.resume() else c.pause() },
+                onPauseResume = { if (s.phase == SessionPhase.Running) c.pause() else c.resume() },
                 onSkip = { c.skipStep() },
                 onExtend = { c.extendStep() },
                 onIntensityUp = { c.increaseIntensity() },
                 onIntensityDown = { c.decreaseIntensity() },
-                onStop = { confirmStop = true },
+                // Nothing recorded yet while waiting to start: cancel without asking.
+                onStop = { if (s.phase == SessionPhase.Ready) c.stop() else confirmStop = true },
             )
         }
     }
@@ -279,10 +290,17 @@ private fun Running(
             FilledTonalButton(onClick = onExtend, contentPadding = CompactPadding) { Text("+1 min") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+            val waiting = s.phase == SessionPhase.Ready
             val paused = s.phase == SessionPhase.Paused
             Button(onClick = onPauseResume, modifier = Modifier.weight(2f).height(52.dp)) {
-                Icon(if (paused) Icons.Default.PlayArrow else Icons.Default.Pause, null)
-                Text(if (paused) " Resume" else " Pause")
+                Icon(if (paused || waiting) Icons.Default.PlayArrow else Icons.Default.Pause, null)
+                Text(
+                    when {
+                        waiting -> " Start"
+                        paused -> " Resume"
+                        else -> " Pause"
+                    },
+                )
             }
             FilledTonalButton(onClick = onSkip, modifier = Modifier.weight(1f).height(52.dp), contentPadding = CompactPadding) {
                 Icon(Icons.Default.SkipNext, null)
@@ -290,7 +308,7 @@ private fun Running(
             }
             OutlinedButton(onClick = onStop, modifier = Modifier.weight(1f).height(52.dp), contentPadding = CompactPadding) {
                 Icon(Icons.Default.Stop, null)
-                Text("End")
+                Text(if (s.phase == SessionPhase.Ready) "Cancel" else "End")
             }
         }
     }
@@ -460,8 +478,23 @@ private fun powerTint(s: SessionState): Color? {
 
 @Composable
 private fun Warnings(s: SessionState) {
+    val info = when {
+        s.waitingForPedaling -> "Start pedaling to begin the workout"
+        s.autoPaused -> "Auto-paused – pedal to continue"
+        else -> null
+    }
+    info?.let {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            Text(
+                it,
+                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
     val messages = buildList {
-        if (s.phase == SessionPhase.Paused) add("Paused – trainer at easy resistance")
+        if (s.phase == SessionPhase.Paused && !s.autoPaused) add("Paused – trainer at easy resistance")
         if (!s.trainerConnected) add("Trainer disconnected – reconnecting…")
         when (s.controlProblem) {
             null, ControlResult.Success -> Unit

@@ -54,6 +54,7 @@ import app.indoortrain.data.SettingsRepository
 import app.indoortrain.data.ThemeMode
 import app.indoortrain.data.UserSettings
 import app.indoortrain.domain.HeartRateZone
+import app.indoortrain.domain.training.Pedaling
 import app.indoortrain.ui.common.color
 import app.indoortrain.devices.DeviceManager
 import app.indoortrain.domain.devices.ConnectionState
@@ -100,6 +101,14 @@ class SettingsViewModel @Inject constructor(
 
     fun setCues(sound: Boolean, vibration: Boolean, voice: Boolean) {
         viewModelScope.launch { settingsRepository.setCues(sound, vibration, voice) }
+    }
+
+    fun setAutoStart(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setAutoStart(enabled) }
+    }
+
+    fun setAutoPause(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setAutoPause(enabled) }
     }
 
     fun setTheme(mode: ThemeMode) {
@@ -173,6 +182,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 }
             }
             CueCard(settings, viewModel::setCues)
+            AutoStartPauseCard(settings, viewModel::setAutoStart, viewModel::setAutoPause)
             ThemeCard(settings.theme, viewModel::setTheme)
 
             Card(Modifier.fillMaxWidth()) {
@@ -299,6 +309,23 @@ private fun CueCard(settings: UserSettings, onChange: (sound: Boolean, vibration
             SwitchRow("Voice", "\"In 10 seconds: 4 minutes at 280 watts\" (uses the phone's text-to-speech)", settings.cueVoice) {
                 onChange(settings.cueSound, settings.cueVibration, it)
             }
+        }
+    }
+}
+
+@Composable
+private fun AutoStartPauseCard(settings: UserSettings, onAutoStart: (Boolean) -> Unit, onAutoPause: (Boolean) -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Start and stop", style = MaterialTheme.typography.titleMedium)
+            Text("Uses the trainer's cadence. Applies from the next workout you start.", style = MaterialTheme.typography.bodySmall)
+            SwitchRow("Auto start", "The workout waits until you start pedaling", settings.autoStart, onAutoStart)
+            SwitchRow(
+                "Auto pause",
+                "Pauses when you stop pedaling for ${Pedaling.AUTO_PAUSE_AFTER_SEC} s and continues when you pedal again",
+                settings.autoPause,
+                onAutoPause,
+            )
         }
     }
 }

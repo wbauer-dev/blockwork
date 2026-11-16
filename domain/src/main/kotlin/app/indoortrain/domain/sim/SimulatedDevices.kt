@@ -88,6 +88,9 @@ class SimulatedSmartTrainer(
 
     private var power = FREE_RIDE_WATTS.toDouble()
 
+    /** false = the simulated rider stopped pedaling (cadence, power and speed drop to 0). */
+    @Volatile var pedaling: Boolean = true
+
     override suspend fun setTargetPower(watts: Int): ControlResult {
         if (status.value.connection != ConnectionState.Connected) return ControlResult.NotConnected
         target.value = capabilities.value.powerRange?.clamp(watts) ?: watts
@@ -100,6 +103,11 @@ class SimulatedSmartTrainer(
     }
 
     override fun tick() {
+        if (!pedaling) {
+            power = 0.0
+            _bikeData.value = BikeSample(powerWatts = 0, cadenceRpm = 0.0, speedKmh = 0.0)
+            return
+        }
         val goal = (target.value ?: FREE_RIDE_WATTS).toDouble()
         // ERG settles within a few seconds; small pedalling noise on top.
         power += (goal - power) * 0.5

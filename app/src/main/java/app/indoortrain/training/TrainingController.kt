@@ -43,20 +43,23 @@ class TrainingController @Inject constructor(
         .flatMapLatest { it?.state ?: flowOf(null) }
         .stateIn(scope, SharingStarted.Eagerly, null)
 
+    /** A session exists that has not finished (it may still be waiting for the rider to pedal). */
     val isActive: Boolean
-        get() = state.value?.phase.let { it == SessionPhase.Running || it == SessionPhase.Paused }
+        get() = state.value?.phase.let { it != null && it != SessionPhase.Finished }
 
     suspend fun start(workout: Workout, plannedSessionId: String? = null) {
         if (isActive) return
-        val ftp = settings.settings.first().ftpWatts
+        val userSettings = settings.settings.first()
         val s = TrainingSession(
             workout = workout,
-            ftp = ftp,
+            ftp = userSettings.ftpWatts,
             trainer = devices.trainer.value,
             heartRateMonitor = devices.heartRateMonitor.value,
             recorder = recorder,
             scope = scope,
             plannedSessionId = plannedSessionId,
+            autoStart = userSettings.autoStart,
+            autoPause = userSettings.autoPause,
         )
         cueJob?.cancel()
         cuePlayer.prepare()

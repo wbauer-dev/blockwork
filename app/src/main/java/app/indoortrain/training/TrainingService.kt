@@ -101,10 +101,22 @@ class TrainingService : LifecycleService() {
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
         if (state == null) return builder.setContentTitle("Workout starting…").build()
 
+        if (state.phase == SessionPhase.Ready) {
+            return builder
+                .setContentTitle(state.workoutName)
+                .setContentText(if (state.waitingForPedaling) "Start pedaling to begin" else "Starting…")
+                .addAction(0, "Start", actionIntent(ACTION_RESUME, 1))
+                .build()
+        }
         val paused = state.phase == SessionPhase.Paused
         val label = state.currentStep.label ?: "Step ${state.stepIndex + 1}"
+        val title = when {
+            state.autoPaused -> "Auto-paused – ${state.workoutName}"
+            paused -> "Paused – ${state.workoutName}"
+            else -> state.workoutName
+        }
         builder
-            .setContentTitle(if (paused) "Paused – ${state.workoutName}" else state.workoutName)
+            .setContentTitle(title)
             .setContentText(
                 "$label · ${state.targetWatts ?: "–"} W · ${formatDuration(state.stepRemainingSec)} left",
             )

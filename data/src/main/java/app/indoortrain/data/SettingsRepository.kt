@@ -38,6 +38,10 @@ data class UserSettings(
     val theme: ThemeMode = ThemeMode.System,
     val onboardingDismissed: Boolean = false,
     val trainingPage: TrainingPage = TrainingPage.Numbers,
+    /** Workout waits for the rider to pedal before it starts. */
+    val autoStart: Boolean = false,
+    /** Workout pauses when the rider stops pedaling and resumes when they pedal again. */
+    val autoPause: Boolean = false,
 ) {
     companion object {
         const val DEFAULT_FTP = 200
@@ -65,6 +69,8 @@ class SettingsRepository @Inject constructor(
         val THEME = stringPreferencesKey("theme")
         val ONBOARDING_DISMISSED = booleanPreferencesKey("onboarding_dismissed")
         val TRAINING_PAGE = stringPreferencesKey("training_page")
+        val AUTO_START = booleanPreferencesKey("auto_start")
+        val AUTO_PAUSE = booleanPreferencesKey("auto_pause")
         fun address(kind: DeviceKind) = stringPreferencesKey("${kind.name}_address")
         fun name(kind: DeviceKind) = stringPreferencesKey("${kind.name}_name")
     }
@@ -83,6 +89,8 @@ class SettingsRepository @Inject constructor(
             onboardingDismissed = p[Keys.ONBOARDING_DISMISSED] ?: false,
             trainingPage = p[Keys.TRAINING_PAGE]?.let { runCatching { TrainingPage.valueOf(it) }.getOrNull() }
                 ?: TrainingPage.Numbers,
+            autoStart = p[Keys.AUTO_START] ?: false,
+            autoPause = p[Keys.AUTO_PAUSE] ?: false,
         )
     }.distinctUntilChanged()
 
@@ -110,6 +118,14 @@ class SettingsRepository @Inject constructor(
             it[Keys.CUE_VIBRATION] = vibration
             it[Keys.CUE_VOICE] = voice
         }
+    }
+
+    suspend fun setAutoStart(enabled: Boolean) {
+        store.edit { it[Keys.AUTO_START] = enabled }
+    }
+
+    suspend fun setAutoPause(enabled: Boolean) {
+        store.edit { it[Keys.AUTO_PAUSE] = enabled }
     }
 
     suspend fun setTheme(mode: ThemeMode) {
