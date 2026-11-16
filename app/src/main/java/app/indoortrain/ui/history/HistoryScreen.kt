@@ -41,9 +41,19 @@ import app.indoortrain.data.rides.RideEntity
 import app.indoortrain.data.rides.RideRepository
 import app.indoortrain.ui.common.formatDuration
 import dagger.hilt.android.lifecycle.HiltViewModel
+import app.indoortrain.domain.training.RideLoad
+import app.indoortrain.domain.training.TrainingLoad
+import app.indoortrain.domain.training.TrainingOverview
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.text.DateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Date
 import javax.inject.Inject
 
@@ -54,6 +64,15 @@ class HistoryViewModel @Inject constructor(
     private val training: TrainingController,
 ) : ViewModel() {
     val rides = repository.rides.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Overview statistics over all finished rides; null while loading. */
+    val overview: StateFlow<Pair<TrainingOverview, LocalDate>?> = repository.rides
+        .map { rides ->
+            val today = LocalDate.now()
+            TrainingLoad.overview(rides.mapNotNull { it.toLoad() }, today) to today
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Deleting while a workout records would remove the ride it is writing to. */
     val workoutRunning: Boolean get() = training.isActive
@@ -67,6 +86,13 @@ class HistoryViewModel @Inject constructor(
     }
 }
 
+/** Finished rides with a duration count; interrupted ones are left out until recovered. */
+private fun RideEntity.toLoad(): RideLoad? {
+    val duration = durationSec?.takeIf { finished && it > 0 } ?: return null
+    val date = Instant.ofEpochMilli(startedAt).atZone(ZoneId.systemDefault()).toLocalDate()
+    return RideLoad(date, duration, tss, energyKj)
+}
+
 fun formatRideDate(millis: Long): String =
     DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))
 
@@ -74,6 +100,7 @@ fun formatRideDate(millis: Long): String =
 @Composable
 fun HistoryScreen(onBack: () -> Unit, onOpen: (Long) -> Unit, viewModel: HistoryViewModel = hiltViewModel()) {
     val rides by viewModel.rides.collectAsStateWithLifecycle()
+    val overview by viewModel.overview.collectAsStateWithLifecycle()
     var confirmDeleteAll by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
@@ -94,6 +121,11 @@ fun HistoryScreen(onBack: () -> Unit, onOpen: (Long) -> Unit, viewModel: History
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (rides.isEmpty()) item { Text("No rides yet.") }
+            val o = overview
+            if (rides.isNotEmpty() && o != null) {
+                item(key = "overview") { TrainingOverviewSection(o.first, o.second) }
+                item(key = "rides-title") { Text("Rides", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 6.dp)) }
+            }
             items(rides, key = { it.id }) { RideCard(it, onOpen) }
         }
     }
