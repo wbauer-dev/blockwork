@@ -19,3 +19,11 @@ fun readTextLimited(context: Context, uri: Uri, maxChars: Int): String {
         String(buffer, 0, total)
     }
 }
+
+/** File name shown by the providing app (e.g. "4x4.zwo"), or null. */
+fun displayName(context: Context, uri: Uri): String? =
+    runCatching {
+        context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+            if (it.moveToFirst()) it.getString(0) else null
+        }
+    }.getOrNull() ?: uri.lastPathSegment

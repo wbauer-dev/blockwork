@@ -9,9 +9,16 @@ import java.util.Date
 import java.util.Locale
 
 object FitShare {
+    private fun exportDir(context: Context) = File(context.cacheDir, "exports")
+
+    /** Deletes the cached copy of the last exported FIT file. */
+    fun clearCache(context: Context) {
+        exportDir(context).listFiles()?.forEach { it.delete() }
+    }
+
     /** Writes the FIT file to the cache and opens the share sheet. */
     fun share(context: Context, bytes: ByteArray, startedAt: Long, workoutName: String) {
-        val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+        val dir = exportDir(context).apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() } // keep only the latest export
         val stamp = SimpleDateFormat("yyyy-MM-dd_HHmm", Locale.ROOT).format(Date(startedAt))
         val safeName = workoutName.replace(Regex("[^A-Za-z0-9._-]+"), "_").take(40)

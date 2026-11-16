@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
@@ -35,4 +36,17 @@ interface RideDao {
 
     @Query("DELETE FROM rides WHERE id = :id")
     suspend fun deleteRide(id: Long)
+
+    @Query("DELETE FROM ride_samples")
+    suspend fun deleteAllSamples()
+
+    @Query("DELETE FROM rides")
+    suspend fun deleteAllRides()
+
+    /** Removes every ride and all recorded samples. */
+    @Transaction
+    suspend fun deleteAll() {
+        deleteAllSamples()
+        deleteAllRides()
+    }
 }

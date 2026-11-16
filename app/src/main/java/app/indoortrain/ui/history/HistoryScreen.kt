@@ -10,7 +10,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import android.content.Context
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import app.indoortrain.training.TrainingController
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,8 +48,23 @@ import java.util.Date
 import javax.inject.Inject
 
 @HiltViewModel
-class HistoryViewModel @Inject constructor(rides: RideRepository) : ViewModel() {
-    val rides = rides.rides.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+class HistoryViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val repository: RideRepository,
+    private val training: TrainingController,
+) : ViewModel() {
+    val rides = repository.rides.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Deleting while a workout records would remove the ride it is writing to. */
+    val workoutRunning: Boolean get() = training.isActive
+
+    fun deleteAll() {
+        if (training.isActive) return
+        viewModelScope.launch {
+            repository.deleteAll()
+            FitShare.clearCache(context)
+        }
+    }
 }
 
 fun formatRideDate(millis: Long): String =
@@ -49,11 +74,17 @@ fun formatRideDate(millis: Long): String =
 @Composable
 fun HistoryScreen(onBack: () -> Unit, onOpen: (Long) -> Unit, viewModel: HistoryViewModel = hiltViewModel()) {
     val rides by viewModel.rides.collectAsStateWithLifecycle()
+    var confirmDeleteAll by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("History") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                actions = {
+                    IconButton(onClick = { confirmDeleteAll = true }, enabled = rides.isNotEmpty()) {
+                        Icon(Icons.Default.DeleteSweep, "Delete all rides")
+                    }
+                },
             )
         },
     ) { padding ->
@@ -65,6 +96,37 @@ fun HistoryScreen(onBack: () -> Unit, onOpen: (Long) -> Unit, viewModel: History
             if (rides.isEmpty()) item { Text("No rides yet.") }
             items(rides, key = { it.id }) { RideCard(it, onOpen) }
         }
+    }
+
+    if (confirmDeleteAll) {
+        val running = viewModel.workoutRunning
+        AlertDialog(
+            onDismissRequest = { confirmDeleteAll = false },
+            title = { Text(if (running) "Workout in progress" else "Delete all ${rides.size} rides?") },
+            text = {
+                Text(
+                    if (running) {
+                        "Finish or end the current workout first – its ride is still being recorded."
+                    } else {
+                        "All rides and their recorded data (power, cadence, heart rate) are removed from this phone. " +
+                            "Training plan sessions will show as not done. FIT files you already exported elsewhere " +
+                            "are not affected. This cannot be undone."
+                    },
+                )
+            },
+            confirmButton = {
+                if (running) {
+                    TextButton(onClick = { confirmDeleteAll = false }) { Text("OK") }
+                } else {
+                    TextButton(onClick = { confirmDeleteAll = false; viewModel.deleteAll() }) {
+                        Text("Delete all", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            dismissButton = {
+                if (!running) TextButton(onClick = { confirmDeleteAll = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 

@@ -25,8 +25,22 @@ import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
-/** Audio/haptic cue requested by the session. */
-enum class Cue { StepStart, Countdown, Finished }
+/** Audio/haptic/voice cue requested by the session. */
+sealed interface Cue {
+    data class StepStart(val label: String?, val durationSec: Int, val targetWatts: Int?, val freeRide: Boolean) : Cue
+
+    data class Upcoming(
+        val label: String?,
+        val durationSec: Int,
+        val targetWatts: Int?,
+        val freeRide: Boolean,
+        val inSeconds: Int,
+    ) : Cue
+
+    data class Countdown(val secondsLeft: Int) : Cue
+
+    data class Finished(val completed: Boolean) : Cue
+}
 
 data class SessionState(
     /** Database id of the recorded ride; null until recording started. */
@@ -170,11 +184,17 @@ class TrainingSession(
 
     private fun handle(events: List<EngineEvent>) {
         for (e in events) {
-            when (e) {
-                is EngineEvent.StepStarted -> _cues.tryEmit(Cue.StepStart)
-                is EngineEvent.Countdown -> _cues.tryEmit(Cue.Countdown)
-                is EngineEvent.Finished -> _cues.tryEmit(Cue.Finished)
+            val cue = when (e) {
+                is EngineEvent.StepStarted ->
+                    Cue.StepStart(e.step.label, e.step.durationSec, engine.startWattsFor(e.step), e.step.freeRide)
+                is EngineEvent.Upcoming -> Cue.Upcoming(
+                    e.step.label, e.step.durationSec, engine.startWattsFor(e.step), e.step.freeRide,
+                    WorkoutEngine.ANNOUNCE_SEC,
+                )
+                is EngineEvent.Countdown -> Cue.Countdown(e.secondsLeft)
+                is EngineEvent.Finished -> Cue.Finished(e.completed)
             }
+            _cues.tryEmit(cue)
         }
     }
 

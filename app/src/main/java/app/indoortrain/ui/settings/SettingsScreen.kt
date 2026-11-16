@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +22,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -40,7 +44,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.indoortrain.data.SettingsRepository
+import app.indoortrain.data.ThemeMode
 import app.indoortrain.data.UserSettings
+import app.indoortrain.domain.HeartRateZone
+import app.indoortrain.ui.common.color
 import app.indoortrain.devices.DeviceManager
 import app.indoortrain.domain.devices.ConnectionState
 import app.indoortrain.domain.devices.DeviceStatus
@@ -72,6 +79,24 @@ class SettingsViewModel @Inject constructor(
         val ftp = text.trim().toIntOrNull()?.takeIf { it in UserSettings.FTP_RANGE } ?: return false
         viewModelScope.launch { settingsRepository.setFtp(ftp) }
         return true
+    }
+
+    fun saveMaxHeartRate(text: String): Boolean {
+        if (text.isBlank()) {
+            viewModelScope.launch { settingsRepository.setMaxHeartRate(null) }
+            return true
+        }
+        val bpm = text.trim().toIntOrNull()?.takeIf { it in HeartRateZone.MAX_HR_RANGE } ?: return false
+        viewModelScope.launch { settingsRepository.setMaxHeartRate(bpm) }
+        return true
+    }
+
+    fun setCues(sound: Boolean, vibration: Boolean, voice: Boolean) {
+        viewModelScope.launch { settingsRepository.setCues(sound, vibration, voice) }
+    }
+
+    fun setTheme(mode: ThemeMode) {
+        viewModelScope.launch { settingsRepository.setTheme(mode) }
     }
 
     fun setSimulation(enabled: Boolean) {
@@ -115,6 +140,9 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             FtpCard(settings.ftpWatts, viewModel::saveFtp)
+            HeartRateCard(settings.maxHeartRate, viewModel::saveMaxHeartRate)
+            CueCard(settings, viewModel::setCues)
+            ThemeCard(settings.theme, viewModel::setTheme)
 
             Card(Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -164,6 +192,98 @@ private fun FtpCard(currentFtp: Int, onSave: (String) -> Boolean) {
                     modifier = Modifier.weight(1f),
                 )
                 Button(onClick = { invalid = !onSave(text) }) { Text("Save") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeartRateCard(maxHr: Int?, onSave: (String) -> Boolean) {
+    var text by remember { mutableStateOf(maxHr?.toString().orEmpty()) }
+    var invalid by remember { mutableStateOf(false) }
+    LaunchedEffect(maxHr) { text = maxHr?.toString().orEmpty() }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Maximum heart rate", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Used for heart-rate zone colours. Leave empty to turn zones off. Stored only on this phone.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it; invalid = false },
+                    suffix = { Text("bpm") },
+                    singleLine = true,
+                    isError = invalid,
+                    supportingText = {
+                        if (invalid) Text("${HeartRateZone.MAX_HR_RANGE.first}–${HeartRateZone.MAX_HR_RANGE.last} bpm")
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+                Button(onClick = { invalid = !onSave(text) }) { Text("Save") }
+            }
+            if (maxHr != null) {
+                val bounds = HeartRateZone.lowerBounds(maxHr)
+                HeartRateZone.entries.forEach { z ->
+                    val upper = HeartRateZone.entries.getOrNull(z.ordinal + 1)?.let { bounds.getValue(it) - 1 }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.foundation.Canvas(Modifier.size(12.dp)) { drawCircle(z.color()) }
+                        Text(
+                            "Z${z.number} ${z.label}: ${bounds.getValue(z)}${upper?.let { "–$it" } ?: "+"} bpm",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CueCard(settings: UserSettings, onChange: (sound: Boolean, vibration: Boolean, voice: Boolean) -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Workout cues", style = MaterialTheme.typography.titleMedium)
+            SwitchRow("Beeps", "3-2-1 before each interval change", settings.cueSound) {
+                onChange(it, settings.cueVibration, settings.cueVoice)
+            }
+            SwitchRow("Vibration", "Short buzz with each beep", settings.cueVibration) {
+                onChange(settings.cueSound, it, settings.cueVoice)
+            }
+            SwitchRow("Voice", "\"In 10 seconds: 4 minutes at 280 watts\" (uses the phone's text-to-speech)", settings.cueVoice) {
+                onChange(settings.cueSound, settings.cueVibration, it)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall)
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThemeCard(mode: ThemeMode, onChange: (ThemeMode) -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Appearance", style = MaterialTheme.typography.titleMedium)
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                ThemeMode.entries.forEachIndexed { i, m ->
+                    SegmentedButton(
+                        selected = m == mode,
+                        onClick = { onChange(m) },
+                        shape = SegmentedButtonDefaults.itemShape(i, ThemeMode.entries.size),
+                    ) { Text(m.name) }
+                }
             }
         }
     }

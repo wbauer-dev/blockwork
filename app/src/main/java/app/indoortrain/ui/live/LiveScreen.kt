@@ -38,7 +38,14 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import app.indoortrain.data.SettingsRepository
 import app.indoortrain.data.plans.PlanRepository
+import app.indoortrain.domain.HeartRateZone
+import app.indoortrain.ui.common.color
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.graphics.Color
 import app.indoortrain.data.rides.RideRepository
 import app.indoortrain.devices.DeviceManager
 import app.indoortrain.ui.plan.PlanTodayCard
@@ -59,9 +66,16 @@ class LiveViewModel @Inject constructor(
     val training: TrainingController,
     plans: PlanRepository,
     rides: RideRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
     val plan = plans.activePlan.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val planRides = rides.planRides.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val settings = settingsRepository.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val hasRides = rides.rides.map { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    fun hideOnboarding() {
+        viewModelScope.launch { settingsRepository.dismissOnboarding() }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,6 +91,8 @@ fun LiveScreen(
     viewModel: LiveViewModel = hiltViewModel(),
 ) {
     val plan by viewModel.plan.collectAsStateWithLifecycle()
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val hasRides by viewModel.hasRides.collectAsStateWithLifecycle()
     val planRides by viewModel.planRides.collectAsStateWithLifecycle()
     val session by viewModel.training.state.collectAsStateWithLifecycle()
     val dm = viewModel.devices
@@ -108,6 +124,19 @@ fun LiveScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             BluetoothAccessBanner(permissions, btOn, simulation, dm::onPermissionsChanged)
+            settings?.takeIf { !it.onboardingDismissed }?.let { st ->
+                GettingStartedCard(
+                    steps = listOf(
+                        OnboardingStep("Set your FTP", "Settings → FTP, or ride the FTP ramp test", st.ftpConfigured, onOpenSettings),
+                        OnboardingStep(
+                            "Pair heart rate strap and trainer", "Bluetooth icon above",
+                            paired.heartRateMonitor != null && paired.trainer != null, onOpenDevices,
+                        ),
+                        OnboardingStep("Ride a workout or create a plan", "Workouts or Plan below", hasRides || plan != null, onOpenWorkouts),
+                    ),
+                    onHide = viewModel::hideOnboarding,
+                )
+            }
             val running = session
             if (running != null) {
                 Button(onClick = onOpenTraining, modifier = Modifier.fillMaxWidth()) {
@@ -150,7 +179,11 @@ fun LiveScreen(
             }
             MetricTile("Power", bike?.powerWatts?.toString(), "W", large = true)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricTile("Heart rate", heartRate?.bpm?.toString(), "bpm", Modifier.weight(1f))
+                val zone = heartRate?.bpm?.let { bpm -> settings?.maxHeartRate?.let { HeartRateZone.forBpm(bpm, it) } }
+                MetricTile(
+                    if (zone != null) "Heart rate · Z${zone.number}" else "Heart rate",
+                    heartRate?.bpm?.toString(), "bpm", Modifier.weight(1f), tint = zone?.color(),
+                )
                 MetricTile("Cadence", bike?.cadenceRpm?.roundToInt()?.toString(), "rpm", Modifier.weight(1f))
             }
             MetricTile("Speed", bike?.speedKmh?.let { "%.1f".format(it) }, "km/h")
@@ -165,8 +198,12 @@ private fun MetricTile(
     unit: String,
     modifier: Modifier = Modifier,
     large: Boolean = false,
+    tint: Color? = null,
 ) {
-    Card(modifier.fillMaxWidth()) {
+    Card(
+        modifier.fillMaxWidth(),
+        colors = if (tint != null) CardDefaults.cardColors(containerColor = tint.copy(alpha = 0.3f)) else CardDefaults.cardColors(),
+    ) {
         Column(Modifier.padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(label, style = MaterialTheme.typography.labelLarge)
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

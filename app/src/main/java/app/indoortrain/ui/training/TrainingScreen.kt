@@ -34,7 +34,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.content.res.Configuration
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalConfiguration
+import app.indoortrain.domain.HeartRateZone
+import app.indoortrain.ui.common.color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -54,7 +58,9 @@ import app.indoortrain.data.UserSettings
 import app.indoortrain.training.TrainingController
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import app.indoortrain.ui.common.ConnectedGreen
@@ -71,6 +77,9 @@ class TrainingViewModel @Inject constructor(
     val controller: TrainingController,
     private val settings: SettingsRepository,
 ) : ViewModel() {
+    val userSettings: StateFlow<UserSettings?> = settings.settings
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     private val _appliedFtp = MutableStateFlow<Int?>(null)
     val appliedFtp: StateFlow<Int?> = _appliedFtp.asStateFlow()
 
@@ -87,6 +96,7 @@ class TrainingViewModel @Inject constructor(
 fun TrainingScreen(onBack: () -> Unit, onDone: () -> Unit, viewModel: TrainingViewModel = hiltViewModel()) {
     val c = viewModel.controller
     val state by c.state.collectAsStateWithLifecycle()
+    val settings by viewModel.userSettings.collectAsStateWithLifecycle()
     var confirmStop by remember { mutableStateOf(false) }
     KeepScreenOn()
 
@@ -109,6 +119,7 @@ fun TrainingScreen(onBack: () -> Unit, onDone: () -> Unit, viewModel: TrainingVi
             }
             else -> Running(
                 s,
+                maxHeartRate = settings?.maxHeartRate,
                 modifier = content,
                 onBack = onBack,
                 onPauseResume = { if (s.phase == SessionPhase.Paused) c.resume() else c.pause() },
@@ -151,6 +162,7 @@ private fun Header(title: String, subtitle: String?, onBack: () -> Unit) {
 @Composable
 private fun Running(
     s: SessionState,
+    maxHeartRate: Int?,
     modifier: Modifier,
     onBack: () -> Unit,
     onPauseResume: () -> Unit,
@@ -160,11 +172,8 @@ private fun Running(
     onIntensityDown: () -> Unit,
     onStop: () -> Unit,
 ) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Header(s.workoutName, "${formatDuration(s.elapsedSec)} · ${formatDuration(s.remainingSec)} left", onBack)
-        Warnings(s)
-        PowerCard(s, Modifier.weight(1.4f))
-
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val tiles = @Composable {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Tile(
                 label = s.currentStep.label ?: "Interval",
@@ -173,21 +182,27 @@ private fun Running(
                 footer = "Step ${s.stepIndex + 1}/${s.steps.size}",
                 modifier = Modifier.weight(1.2f),
             )
-            Tile("Heart rate", s.heartRateBpm?.toString(), "bpm", modifier = Modifier.weight(1f))
+            val zone = s.heartRateBpm?.let { bpm -> maxHeartRate?.let { HeartRateZone.forBpm(bpm, it) } }
+            Tile(
+                if (zone != null) "Heart rate · Z${zone.number}" else "Heart rate",
+                s.heartRateBpm?.toString(), "bpm",
+                modifier = Modifier.weight(1f),
+                tint = zone?.color(),
+            )
             Tile("Cadence", s.cadenceRpm?.toString(), "rpm", modifier = Modifier.weight(1f))
         }
-
-        NextCard(s)
-
+    }
+    val profile = @Composable { m: Modifier ->
         WorkoutProfile(
             steps = s.steps,
-            modifier = Modifier.fillMaxWidth().weight(1f).heightIn(min = 56.dp),
+            modifier = m.fillMaxWidth().heightIn(min = 48.dp),
             progressSec = s.currentStep.startSec + s.stepElapsedSec,
             powerHistory = s.powerHistory,
             ftp = s.ftp,
             intensity = s.intensity,
         )
-
+    }
+    val controls = @Composable {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedButton(onClick = onIntensityDown, contentPadding = CompactPadding) { Text("−5 %") }
             Text(
@@ -213,6 +228,31 @@ private fun Running(
                 Icon(Icons.Default.Stop, null)
                 Text("End")
             }
+        }
+    }
+
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Header(s.workoutName, "${formatDuration(s.elapsedSec)} · ${formatDuration(s.remainingSec)} left", onBack)
+        Warnings(s)
+        if (landscape) {
+            // Two columns: numbers left, what's next + controls right.
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PowerCard(s, Modifier.weight(1f))
+                    tiles()
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NextCard(s)
+                    profile(Modifier.weight(1f))
+                    controls()
+                }
+            }
+        } else {
+            PowerCard(s, Modifier.weight(1.4f))
+            tiles()
+            NextCard(s)
+            profile(Modifier.weight(1f))
+            controls()
         }
     }
 }
@@ -302,8 +342,18 @@ private fun NextCard(s: SessionState) {
 }
 
 @Composable
-private fun Tile(label: String, value: String?, unit: String, modifier: Modifier = Modifier, footer: String? = null) {
-    Card(modifier) {
+private fun Tile(
+    label: String,
+    value: String?,
+    unit: String,
+    modifier: Modifier = Modifier,
+    footer: String? = null,
+    tint: Color? = null,
+) {
+    Card(
+        modifier,
+        colors = if (tint != null) CardDefaults.cardColors(containerColor = tint.copy(alpha = 0.3f)) else CardDefaults.cardColors(),
+    ) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

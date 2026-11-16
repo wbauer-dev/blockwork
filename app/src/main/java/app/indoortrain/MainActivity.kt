@@ -7,6 +7,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.indoortrain.data.SettingsRepository
+import app.indoortrain.data.ThemeMode
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -26,6 +30,10 @@ import app.indoortrain.ui.theme.IndoorTrainTheme
 import app.indoortrain.ui.training.TrainingScreen
 import app.indoortrain.ui.editor.WorkoutEditorScreen
 import app.indoortrain.ui.history.HistoryScreen
+import app.indoortrain.ui.importing.ExternalImport
+import app.indoortrain.ui.importing.ExternalImportHolder
+import app.indoortrain.ui.importing.ImportScreen
+import androidx.core.content.IntentCompat
 import app.indoortrain.ui.history.RideDetailScreen
 import app.indoortrain.ui.workouts.WorkoutDetailScreen
 import app.indoortrain.ui.workouts.WorkoutListScreen
@@ -37,6 +45,11 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var deviceManager: DeviceManager
     @Inject lateinit var trainingController: TrainingController
+    @Inject lateinit var settingsRepository: SettingsRepository
+    @Inject lateinit var importHolder: ExternalImportHolder
+
+    /** Set when a file was opened with / shared to the app. */
+    private val openImport = mutableStateOf(false)
 
     /** Set when opened from the workout notification. */
     private val openTraining = mutableStateOf(false)
@@ -46,7 +59,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         handleIntent(intent)
         setContent {
-            IndoorTrainTheme {
+            val settings by settingsRepository.settings.collectAsStateWithLifecycle(initialValue = null)
+            IndoorTrainTheme(mode = settings?.theme ?: ThemeMode.System) {
                 val nav = rememberNavController()
                 LaunchedEffect(openTraining.value) {
                     if (openTraining.value) {
@@ -58,7 +72,20 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                LaunchedEffect(openImport.value) {
+                    if (openImport.value) {
+                        openImport.value = false
+                        nav.navigate(Routes.IMPORT) { launchSingleTop = true }
+                    }
+                }
                 NavHost(navController = nav, startDestination = Routes.LIVE) {
+                    composable(Routes.IMPORT) {
+                        ImportScreen(
+                            onClose = { nav.popBackStack() },
+                            onOpenWorkout = { id -> nav.navigate(Routes.workout(id)) { popUpTo(Routes.LIVE) } },
+                            onOpenPlan = { nav.navigate(Routes.PLAN) { popUpTo(Routes.LIVE) } },
+                        )
+                    }
                     composable(Routes.LIVE) {
                         LiveScreen(
                             onOpenDevices = { nav.navigate(Routes.DEVICES) },
@@ -145,7 +172,20 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra(EXTRA_OPEN_TRAINING, false) == true) openTraining.value = true
+        if (intent == null) return
+        if (intent.getBooleanExtra(EXTRA_OPEN_TRAINING, false)) openTraining.value = true
+        val request = when (intent.action) {
+            Intent.ACTION_VIEW -> intent.data?.let { ExternalImport.FromUri(it) }
+            Intent.ACTION_SEND ->
+                IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)?.let { ExternalImport.FromUri(it) }
+                    ?: intent.getStringExtra(Intent.EXTRA_TEXT)?.let { ExternalImport.FromText(it) }
+            else -> null
+        }
+        if (request != null) {
+            intent.action = null // handle once (e.g. not again after rotation)
+            importHolder.pending.value = request
+            openImport.value = true
+        }
     }
 
     override fun onResume() {
@@ -160,6 +200,7 @@ class MainActivity : ComponentActivity() {
         const val SETTINGS = "settings"
         const val WORKOUTS = "workouts"
         const val TRAINING = "training"
+        const val IMPORT = "import"
         const val PLAN = "plan"
         const val PLAN_NEW = "plan/new"
         const val PLAN_SESSION = "plan/session/{id}"

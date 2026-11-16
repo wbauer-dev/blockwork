@@ -129,3 +129,28 @@ class FreeRideEngineTest {
         assertThat(BuiltInWorkouts.rampTest.flatten().last().fromFtp).isWithin(1e-9).of(0.50 + 0.06 * 24)
     }
 }
+
+class AnnouncementTest {
+    @Test fun announcesNextStepTenSecondsBefore() {
+        val w = app.indoortrain.domain.Workout(
+            "a", "Announce",
+            segments = listOf(app.indoortrain.domain.Segment.Steady(30, 0.5), app.indoortrain.domain.Segment.Steady(60, 1.0, "Hard")),
+        )
+        val e = WorkoutEngine(w, 200).apply { start() }
+        val events = (1..30).flatMap { e.tick() }
+        val upcoming = events.filterIsInstance<EngineEvent.Upcoming>().single()
+        assertThat(upcoming.index).isEqualTo(1)
+        assertThat(upcoming.step.label).isEqualTo("Hard")
+        // announcement comes before the 3-2-1 countdown
+        assertThat(events.indexOf(upcoming)).isLessThan(events.indexOfFirst { it is EngineEvent.Countdown })
+    }
+
+    @Test fun heartRateZones() {
+        val max = 190
+        assertThat(app.indoortrain.domain.HeartRateZone.forBpm(100, max).number).isEqualTo(1)
+        assertThat(app.indoortrain.domain.HeartRateZone.forBpm(114, max).number).isEqualTo(2) // 60 %
+        assertThat(app.indoortrain.domain.HeartRateZone.forBpm(160, max).number).isEqualTo(4)
+        assertThat(app.indoortrain.domain.HeartRateZone.forBpm(185, max).number).isEqualTo(5)
+        assertThat(app.indoortrain.domain.HeartRateZone.lowerBounds(max)[app.indoortrain.domain.HeartRateZone.Z3]).isEqualTo(133)
+    }
+}

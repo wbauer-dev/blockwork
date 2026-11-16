@@ -19,9 +19,18 @@ import javax.inject.Singleton
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
+enum class ThemeMode { System, Light, Dark }
+
 data class UserSettings(
     val ftpWatts: Int = DEFAULT_FTP,
+    /** false until the user saved an FTP (or applied a ramp test result). */
+    val ftpConfigured: Boolean = false,
     val maxHeartRate: Int? = null,
+    val cueSound: Boolean = true,
+    val cueVibration: Boolean = true,
+    val cueVoice: Boolean = false,
+    val theme: ThemeMode = ThemeMode.System,
+    val onboardingDismissed: Boolean = false,
 ) {
     companion object {
         const val DEFAULT_FTP = 200
@@ -43,6 +52,11 @@ class SettingsRepository @Inject constructor(
         val FTP = intPreferencesKey("ftp_watts")
         val MAX_HR = intPreferencesKey("max_heart_rate")
         val USE_SIMULATION = booleanPreferencesKey("use_simulation")
+        val CUE_SOUND = booleanPreferencesKey("cue_sound")
+        val CUE_VIBRATION = booleanPreferencesKey("cue_vibration")
+        val CUE_VOICE = booleanPreferencesKey("cue_voice")
+        val THEME = stringPreferencesKey("theme")
+        val ONBOARDING_DISMISSED = booleanPreferencesKey("onboarding_dismissed")
         fun address(kind: DeviceKind) = stringPreferencesKey("${kind.name}_address")
         fun name(kind: DeviceKind) = stringPreferencesKey("${kind.name}_name")
     }
@@ -52,7 +66,13 @@ class SettingsRepository @Inject constructor(
     val settings: Flow<UserSettings> = store.data.map { p ->
         UserSettings(
             ftpWatts = p[Keys.FTP] ?: UserSettings.DEFAULT_FTP,
+            ftpConfigured = p[Keys.FTP] != null,
             maxHeartRate = p[Keys.MAX_HR],
+            cueSound = p[Keys.CUE_SOUND] ?: true,
+            cueVibration = p[Keys.CUE_VIBRATION] ?: true,
+            cueVoice = p[Keys.CUE_VOICE] ?: false,
+            theme = p[Keys.THEME]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System,
+            onboardingDismissed = p[Keys.ONBOARDING_DISMISSED] ?: false,
         )
     }.distinctUntilChanged()
 
@@ -72,6 +92,22 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setMaxHeartRate(bpm: Int?) {
         store.edit { if (bpm == null) it.remove(Keys.MAX_HR) else it[Keys.MAX_HR] = bpm }
+    }
+
+    suspend fun setCues(sound: Boolean, vibration: Boolean, voice: Boolean) {
+        store.edit {
+            it[Keys.CUE_SOUND] = sound
+            it[Keys.CUE_VIBRATION] = vibration
+            it[Keys.CUE_VOICE] = voice
+        }
+    }
+
+    suspend fun setTheme(mode: ThemeMode) {
+        store.edit { it[Keys.THEME] = mode.name }
+    }
+
+    suspend fun dismissOnboarding() {
+        store.edit { it[Keys.ONBOARDING_DISMISSED] = true }
     }
 
     suspend fun setPairedDevice(device: PairedDevice) {

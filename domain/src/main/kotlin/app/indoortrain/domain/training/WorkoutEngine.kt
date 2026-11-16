@@ -13,6 +13,9 @@ sealed interface EngineEvent {
     /** Seconds left in the current step (3, 2, 1). */
     data class Countdown(val secondsLeft: Int) : EngineEvent
 
+    /** [ANNOUNCE_SEC] seconds before the next step starts (only for steps long enough to announce). */
+    data class Upcoming(val index: Int, val step: Step) : EngineEvent
+
     data class Finished(val completed: Boolean) : EngineEvent
 }
 
@@ -80,9 +83,12 @@ class WorkoutEngine(val workout: Workout, val ftp: Int) {
         elapsedSec++
         stepElapsedSec++
         val remaining = stepRemainingSec
+        val next = nextStep
         return when {
             remaining <= 0 -> advance()
             remaining <= COUNTDOWN_SEC -> listOf(EngineEvent.Countdown(remaining))
+            remaining == ANNOUNCE_SEC && next != null && currentStep.durationSec >= MIN_ANNOUNCE_STEP_SEC ->
+                listOf(EngineEvent.Upcoming(stepIndex + 1, next))
             else -> emptyList()
         }
     }
@@ -135,6 +141,8 @@ class WorkoutEngine(val workout: Workout, val ftp: Int) {
 
     companion object {
         const val COUNTDOWN_SEC = 3
+        const val ANNOUNCE_SEC = 10
+        private const val MIN_ANNOUNCE_STEP_SEC = 20
         const val INTENSITY_STEP = 0.05
         const val PAUSE_FTP_FRACTION = 0.4
 

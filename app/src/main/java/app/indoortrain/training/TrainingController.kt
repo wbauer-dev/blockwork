@@ -59,6 +59,7 @@ class TrainingController @Inject constructor(
             plannedSessionId = plannedSessionId,
         )
         cueJob?.cancel()
+        cuePlayer.prepare()
         cueJob = scope.launch { s.cues.collect(cuePlayer::play) }
         session.value = s
         TrainingService.start(context)
@@ -77,6 +78,7 @@ class TrainingController @Inject constructor(
     fun dismiss() {
         if (isActive) return
         cueJob?.cancel()
+        cuePlayer.release()
         session.value = null
     }
 

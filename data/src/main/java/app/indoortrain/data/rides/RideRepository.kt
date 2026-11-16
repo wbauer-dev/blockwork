@@ -40,6 +40,8 @@ class RideRepository @Inject constructor(private val dao: RideDao) {
     }
 
     suspend fun delete(id: Long) = dao.deleteRide(id)
+
+    suspend fun deleteAll() = dao.deleteAll()
 }
 
 internal fun RideSampleEntity.toDomain() = RideSample(

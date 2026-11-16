@@ -1,6 +1,6 @@
 # Indoor Cycling App – Project Plan
 
-Status: draft v1 · 2026-11-16 · Phase 0–4 done · Phase 5 implemented, device test pending
+Status: draft v1 · 2026-11-16 · Phase 0–5 done · Phase 6 polish implemented (device test pending), Play Store prep deferred
 
 ## 1. Goal & scope
 
@@ -186,9 +186,10 @@ Import works through the Android file picker and "Open with / Share to app". Imp
 - Plan creation wizard, calendar/week view, "today's workout", linking rides to planned sessions
 - Plan import/export (JSON)
 
-### Phase 6 – Polish / Play Store prep (when needed)
-- Onboarding, landscape layout, settings (zones, cues, units), dark theme fine-tuning
-- Play Store: privacy policy, Data Safety form (heart rate counts as **health data**), signing, crash reporting without personal data
+### Phase 6 – Polish (done) / Play Store prep (deferred)
+- Done: settings for max heart rate (HR zone colours), workout cues (beeps, vibration, voice announcements 10 s before each interval), theme (system/light/dark); landscape training layout; getting-started card; "Open with IndoorTrain" / share-to-app import for workout and plan files
+- Not done: units (metric only), release build with R8 shrinking and signing
+- Deferred – Play Store: privacy policy, Data Safety form (heart rate counts as **health data**), signing, crash reporting without personal data
 
 ## 5. Testing strategy
 

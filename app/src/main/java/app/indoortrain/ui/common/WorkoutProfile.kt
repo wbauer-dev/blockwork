@@ -84,3 +84,12 @@ fun WorkoutProfile(
         }
     }
 }
+
+/** Heart-rate zone colours, matching the power-zone palette. */
+fun app.indoortrain.domain.HeartRateZone.color(): Color = when (this) {
+    app.indoortrain.domain.HeartRateZone.Z1 -> Color(0xFF9E9E9E)
+    app.indoortrain.domain.HeartRateZone.Z2 -> Color(0xFF2196F3)
+    app.indoortrain.domain.HeartRateZone.Z3 -> Color(0xFF43A047)
+    app.indoortrain.domain.HeartRateZone.Z4 -> Color(0xFFFB8C00)
+    app.indoortrain.domain.HeartRateZone.Z5 -> Color(0xFFE53935)
+}
