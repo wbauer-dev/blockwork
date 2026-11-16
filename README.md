@@ -18,7 +18,7 @@ An Android app for structured indoor cycling. It controls a smart trainer in **E
 - **Workout library:** built-in workouts, an editor, and import of Zwift `.zwo`, `.erg`, `.mrc` and JSON files, including "Open with IndoorTrain".
 - **FTP ramp test** with an FTP estimate (75 % of best 1-minute power).
 - **Training plans:**
-  - Goals: base endurance, FTP build, VO2max, general fitness. Length 4–12 weeks, 2–6 days per week.
+  - Goals: base endurance, FTP build, VO2max, general fitness, polarized (80/20). Length 4–12 weeks, 2–6 days per week.
   - Blocks of build weeks followed by a recovery week, with an FTP test in week 1 and in every recovery week.
   - Progressive intervals and never two hard days in a row.
   - Plans can be exported and imported as JSON.

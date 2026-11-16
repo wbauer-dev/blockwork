@@ -10,6 +10,10 @@ enum class PlanGoal(val title: String, val description: String) {
     FtpBuild("FTP build", "Sweet spot and threshold intervals to raise your FTP, VO2max added later."),
     Vo2Max("VO2max", "Short, hard intervals above threshold to raise your ceiling."),
     GeneralFitness("General fitness", "A balanced mix of endurance, sweet spot and short hard efforts."),
+    Polarized(
+        "Polarized (80/20)",
+        "Mostly easy zone 2 with one or two very hard interval days (4×8, 30/15, VO2max) – no tempo or sweet spot.",
+    ),
 }
 
 enum class WeekKind { Build, Recovery }
@@ -22,6 +26,10 @@ enum class SessionType(val hard: Boolean, val title: String) {
     SweetSpot(true, "Sweet spot"),
     Threshold(true, "Threshold"),
     Vo2Max(true, "VO2max"),
+    /** 4×8-style intervals around FTP with short rests (Seiler et al., 2013). */
+    LongIntervals(true, "Long intervals"),
+    /** Sets of 30 s on / 15 s off (Rønnestad et al., 2015). */
+    ShortIntervals(true, "30/15 intervals"),
     FtpTest(true, "FTP test"),
 }
 

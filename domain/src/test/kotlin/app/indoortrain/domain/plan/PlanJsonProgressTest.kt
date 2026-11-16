@@ -6,6 +6,7 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.time.DayOfWeek.SATURDAY
+import java.time.DayOfWeek.SUNDAY
 import java.time.DayOfWeek.THURSDAY
 import java.time.DayOfWeek.TUESDAY
 import java.time.LocalDate
@@ -17,6 +18,21 @@ class PlanJsonProgressTest {
     )
 
     @Test fun roundTripRedatesAndReassignsIds() {
+        assertRoundTrip(plan)
+    }
+
+    /** Polarized plans carry the newer session types and 30/15 sets (several repeat blocks per workout). */
+    @Test fun roundTripPolarized() {
+        val polarized = PlanGenerator.generate(
+            PlanRequest(PlanGoal.Polarized, 12, setOf(TUESDAY, THURSDAY, SATURDAY, SUNDAY), 60, LocalDate.of(2026, 11, 16)),
+            "orig",
+        )
+        assertThat(polarized.sessions.map { it.type })
+            .containsAtLeast(SessionType.LongIntervals, SessionType.ShortIntervals, SessionType.Vo2Max)
+        assertRoundTrip(polarized)
+    }
+
+    private fun assertRoundTrip(plan: TrainingPlan) {
         val text = PlanJson.encode(plan)
         assertThat(text).contains("\"format\":\"indoortrain-plan\"")
         val copy = PlanJson.decode(text, "new", LocalDate.of(2027, 3, 3))

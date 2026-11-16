@@ -120,7 +120,7 @@ Import works through the Android file picker and "Open with / Share to app". Imp
 
 **Inputs:** FTP, goal, plan length (4–12 weeks), sessions per week, typical session length, preferred days.
 
-**Goals (first set):** *Base endurance*, *FTP build*, *VO2max*, *General fitness*.
+**Goals (first set):** *Base endurance*, *FTP build*, *VO2max*, *General fitness*; later added *Polarized (80/20)* with 4×8 long intervals (Seiler et al., 2013) and 30/15 short intervals (Rønnestad et al., 2015).
 
 **Rules:**
 - Zones: Coggan power zones (Z1 < 55 %, Z2 56–75 %, Z3 76–90 %, Z4 91–105 %, Z5 106–120 %, Z6 > 120 % FTP)

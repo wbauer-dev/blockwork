@@ -35,6 +35,23 @@ object WorkoutTemplates {
         Prog(2, 25, 0.84, 5), Prog(3, 20, 0.85, 5), Prog(2, 30, 0.85, 5), Prog(3, 25, 0.85, 5),
     )
 
+    /** 4×8-style long intervals (Seiler et al., 2013): 2–3 min rest, around FTP. */
+    private val longIntervals = listOf(
+        Prog(3, 6, 1.00, 2), Prog(3, 8, 1.00, 2), Prog(4, 6, 1.02, 2), Prog(4, 7, 1.02, 2),
+        Prog(4, 8, 1.02, 2), Prog(4, 8, 1.04, 2), Prog(5, 8, 1.02, 2), Prog(5, 8, 1.04, 2), Prog(4, 10, 1.02, 3),
+    )
+
+    /** sets × reps of 30 s on / 15 s off at pct FTP (Rønnestad et al., 2015 used 3 × 13). */
+    private data class SetProg(val sets: Int, val reps: Int, val pct: Double)
+
+    private val shortIntervals = listOf(
+        SetProg(2, 10, 1.18), SetProg(2, 12, 1.18), SetProg(3, 10, 1.18), SetProg(3, 11, 1.20),
+        SetProg(3, 12, 1.20), SetProg(3, 13, 1.20), SetProg(3, 13, 1.22), SetProg(4, 12, 1.20), SetProg(4, 13, 1.20),
+    )
+    private const val SHORT_ON_SEC = 30
+    private const val SHORT_OFF_SEC = 15
+    private const val SET_REST_SEC = 180
+
     fun create(type: SessionType, level: Int, minutes: Int, id: String, context: String): Workout = when (type) {
         SessionType.Endurance -> endurance(id, minutes, level, "Endurance", context)
         SessionType.LongRide -> endurance(id, minutes, level, "Long ride", context)
@@ -43,6 +60,8 @@ object WorkoutTemplates {
         SessionType.SweetSpot -> intervals(id, "Sweet spot", sweetSpot, level, minutes, context)
         SessionType.Threshold -> intervals(id, "Threshold", threshold, level, minutes, context)
         SessionType.Vo2Max -> intervals(id, "VO2max", vo2max, level, minutes, context)
+        SessionType.LongIntervals -> intervals(id, "Long intervals", longIntervals, level, minutes, context)
+        SessionType.ShortIntervals -> shortIntervals(id, level, minutes, context)
         SessionType.FtpTest -> BuiltInWorkouts.rampTest.copy(
             id = id,
             description = "$context ${BuiltInWorkouts.rampTest.description}",
@@ -98,6 +117,47 @@ object WorkoutTemplates {
                 (if (p.reps > 1) " with ${p.restMin} min easy between." else "."),
             segments = segments,
         )
+    }
+
+    private fun shortIntervals(id: String, level: Int, minutes: Int, context: String): Workout {
+        val warm = (if (minutes >= 45) 10 else 8) * 60
+        val cool = 5 * 60
+        val available = minutes * 60 - warm - cool
+        val p = fitSets(shortIntervals[level.coerceIn(0, shortIntervals.lastIndex)], available)
+        val filler = available - setsDuration(p)
+        val set = Segment.Repeat(
+            p.reps,
+            listOf(Segment.Steady(SHORT_ON_SEC, p.pct, "On"), Segment.Steady(SHORT_OFF_SEC, 0.50, "Off")),
+        )
+        val segments = buildList {
+            add(Segment.Ramp(warm, 0.50, 0.75, "Warmup"))
+            repeat(p.sets) { i ->
+                if (i > 0) add(Segment.Steady(SET_REST_SEC, 0.50, "Set rest"))
+                add(set)
+            }
+            if (filler > 0) add(Segment.Steady(filler, 0.65, "Endurance"))
+            add(Segment.Ramp(cool, 0.60, 0.45, "Cooldown"))
+        }
+        return Workout(
+            id = id,
+            name = "30/15 intervals ${p.sets}×${p.reps}",
+            description = "$context ${p.sets} " + (if (p.sets == 1) "set" else "sets") +
+                " of ${p.reps} × (30 s at ${pctText(p.pct)} / 15 s easy)" +
+                (if (p.sets > 1) ", ${SET_REST_SEC / 60} min easy between sets." else "."),
+            segments = segments,
+        )
+    }
+
+    private fun setsDuration(p: SetProg) = p.sets * p.reps * (SHORT_ON_SEC + SHORT_OFF_SEC) + (p.sets - 1) * SET_REST_SEC
+
+    /** Like [fit] for 30/15 sets: fewer sets and/or reps, keeping the most work (ties: more sets). */
+    private fun fitSets(p: SetProg, availableSec: Int): SetProg {
+        if (setsDuration(p) <= availableSec) return p
+        val candidates = (p.sets downTo 1).flatMap { sets ->
+            (p.reps downTo 1).map { reps -> p.copy(sets = sets, reps = reps) }
+        }.filter { setsDuration(it) <= availableSec }
+        return candidates.maxWithOrNull(compareBy<SetProg>({ it.sets * it.reps }, { it.sets }))
+            ?: p.copy(sets = 1, reps = max(1, availableSec / (SHORT_ON_SEC + SHORT_OFF_SEC)))
     }
 
     /**

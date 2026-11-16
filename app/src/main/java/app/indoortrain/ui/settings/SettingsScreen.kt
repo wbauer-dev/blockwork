@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -25,6 +26,8 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -34,9 +37,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -124,8 +130,17 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val trainerStatus by viewModel.devices.trainerStatus.collectAsStateWithLifecycle()
     val capabilities by viewModel.devices.trainerCapabilities.collectAsStateWithLifecycle()
     val ergResult by viewModel.ergResult.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    fun notify(message: String) {
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            snackbar.showSnackbar(message)
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text("Settings") },
@@ -139,8 +154,19 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            FtpCard(settings.ftpWatts, viewModel::saveFtp)
-            HeartRateCard(settings.maxHeartRate, viewModel::saveMaxHeartRate)
+            FtpCard(settings.ftpWatts) { text ->
+                viewModel.saveFtp(text).also { ok -> if (ok) notify("FTP saved: ${text.trim()} W") }
+            }
+            HeartRateCard(settings.maxHeartRate) { text ->
+                viewModel.saveMaxHeartRate(text).also { ok ->
+                    if (ok) {
+                        notify(
+                            if (text.isBlank()) "Maximum heart rate cleared – zones off"
+                            else "Maximum heart rate saved: ${text.trim()} bpm",
+                        )
+                    }
+                }
+            }
             CueCard(settings, viewModel::setCues)
             ThemeCard(settings.theme, viewModel::setTheme)
 
@@ -175,6 +201,11 @@ private fun FtpCard(currentFtp: Int, onSave: (String) -> Boolean) {
     var text by remember { mutableStateOf(currentFtp.toString()) }
     var invalid by remember { mutableStateOf(false) }
     LaunchedEffect(currentFtp) { text = currentFtp.toString() }
+    val focus = LocalFocusManager.current
+    val dirty = text.trim() != currentFtp.toString()
+    fun save() {
+        if (onSave(text)) focus.clearFocus() else invalid = true
+    }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("FTP", style = MaterialTheme.typography.titleMedium)
@@ -188,10 +219,11 @@ private fun FtpCard(currentFtp: Int, onSave: (String) -> Boolean) {
                     supportingText = {
                         if (invalid) Text("${UserSettings.FTP_RANGE.first}–${UserSettings.FTP_RANGE.last} W")
                     },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (dirty) save() else focus.clearFocus() }),
                     modifier = Modifier.weight(1f),
                 )
-                Button(onClick = { invalid = !onSave(text) }) { Text("Save") }
+                Button(onClick = { save() }, enabled = dirty) { Text("Save") }
             }
         }
     }
@@ -202,6 +234,11 @@ private fun HeartRateCard(maxHr: Int?, onSave: (String) -> Boolean) {
     var text by remember { mutableStateOf(maxHr?.toString().orEmpty()) }
     var invalid by remember { mutableStateOf(false) }
     LaunchedEffect(maxHr) { text = maxHr?.toString().orEmpty() }
+    val focus = LocalFocusManager.current
+    val dirty = text.trim() != maxHr?.toString().orEmpty()
+    fun save() {
+        if (onSave(text)) focus.clearFocus() else invalid = true
+    }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Maximum heart rate", style = MaterialTheme.typography.titleMedium)
@@ -219,10 +256,11 @@ private fun HeartRateCard(maxHr: Int?, onSave: (String) -> Boolean) {
                     supportingText = {
                         if (invalid) Text("${HeartRateZone.MAX_HR_RANGE.first}–${HeartRateZone.MAX_HR_RANGE.last} bpm")
                     },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (dirty) save() else focus.clearFocus() }),
                     modifier = Modifier.weight(1f),
                 )
-                Button(onClick = { invalid = !onSave(text) }) { Text("Save") }
+                Button(onClick = { save() }, enabled = dirty) { Text("Save") }
             }
             if (maxHr != null) {
                 val bounds = HeartRateZone.lowerBounds(maxHr)

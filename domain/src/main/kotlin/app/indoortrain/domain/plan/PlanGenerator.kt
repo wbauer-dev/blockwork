@@ -109,6 +109,9 @@ object PlanGenerator {
     private fun hardSessions(goal: PlanGoal, n: Int, block: Int): Int = when (goal) {
         PlanGoal.BaseEndurance -> if (block >= 1 && n >= 5) 2 else 1
         PlanGoal.GeneralFitness -> if (n <= 3) 1 else 2
+        // 80/20 by time in zone, not by session count: at most two hard days (as in Seiler et al., 2013),
+        // whose intervals are only part of the session, so most of the weekly time stays easy.
+        PlanGoal.Polarized -> if (n <= 3) 1 else 2
         PlanGoal.FtpBuild, PlanGoal.Vo2Max -> when {
             n <= 2 -> 1
             n >= 5 && block >= 1 -> 3
@@ -129,9 +132,16 @@ object PlanGenerator {
         PlanGoal.Vo2Max -> if (block == 0) {
             listOf(SessionType.Vo2Max, SessionType.Threshold, SessionType.SweetSpot)
         } else {
-            listOf(SessionType.Vo2Max, SessionType.Threshold, SessionType.Vo2Max)
+            listOf(SessionType.Vo2Max, SessionType.Threshold, SessionType.ShortIntervals)
         }
-        PlanGoal.GeneralFitness -> listOf(SessionType.SweetSpot, SessionType.Vo2Max)
+        PlanGoal.GeneralFitness ->
+            listOf(SessionType.SweetSpot, if (level % 2 == 0) SessionType.Vo2Max else SessionType.ShortIntervals)
+        // Long intervals first, short/VO2max work rotates in as the second key session.
+        PlanGoal.Polarized -> when {
+            block == 0 -> listOf(SessionType.LongIntervals, SessionType.ShortIntervals)
+            level % 2 == 0 -> listOf(SessionType.LongIntervals, SessionType.Vo2Max)
+            else -> listOf(SessionType.ShortIntervals, SessionType.LongIntervals)
+        }
     }
 
     private fun sessionTypes(goal: PlanGoal, n: Int, block: Int, level: Int, hardCount: Int, testFirst: Boolean): List<SessionType> {

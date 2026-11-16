@@ -90,7 +90,10 @@ class PlanGeneratorTest {
             assertWithMessage(label).that(plan.sessions.map { it.id }).containsNoDuplicates()
             // interval and endurance sessions last exactly the requested time
             plan.weeks.filter { it.kind == WeekKind.Build }.flatMap { it.sessions }
-                .filter { it.type in setOf(SessionType.Endurance, SessionType.SweetSpot, SessionType.Threshold, SessionType.Vo2Max, SessionType.Tempo) }
+                .filter { it.type in setOf(
+                    SessionType.Endurance, SessionType.SweetSpot, SessionType.Threshold, SessionType.Vo2Max, SessionType.Tempo,
+                    SessionType.LongIntervals, SessionType.ShortIntervals,
+                ) }
                 .forEach { assertWithMessage("$label ${it.workout.name}").that(it.workout.durationSec).isEqualTo(req.sessionMinutes * 60) }
         }
         assertThat(count).isEqualTo(PlanGoal.entries.size * PlanRequest.WEEKS.count() * daySets.size * 3)
@@ -134,6 +137,40 @@ class PlanGeneratorTest {
 
         val vo2 = PlanGenerator.generate(request(goal = PlanGoal.Vo2Max), "p")
         assertThat(vo2.weeks[1].sessions.map { it.type }).contains(SessionType.Vo2Max)
+    }
+
+    @Test fun polarizedIsMostlyEasy() {
+        for ((plan, req) in allPlans()) {
+            if (req.goal != PlanGoal.Polarized) continue
+            val label = "${req.weeks}w ${req.trainingDays} ${req.sessionMinutes}min"
+            val types = plan.sessions.map { it.type }
+            assertWithMessage(label).that(types).containsNoneOf(SessionType.Tempo, SessionType.SweetSpot, SessionType.Threshold)
+            plan.weeks.forEach { week ->
+                assertWithMessage(label).that(week.sessions.count { it.type.hard }).isAtMost(2)
+            }
+        }
+        val plan = PlanGenerator.generate(request(goal = PlanGoal.Polarized, weeks = 12), "p")
+        val types = plan.sessions.map { it.type }
+        assertThat(types).containsAtLeast(SessionType.LongIntervals, SessionType.ShortIntervals, SessionType.Vo2Max)
+        // four days a week: two hard, two easy in every build week
+        plan.weeks.filter { it.kind == WeekKind.Build }.forEach { week ->
+            assertThat(week.sessions.count { it.type.hard }).isEqualTo(2)
+        }
+    }
+
+    @Test fun shortIntervalWorkoutShape() {
+        val w = WorkoutTemplates.create(SessionType.ShortIntervals, level = 5, minutes = 75, id = "s", context = "Week 6.")
+        assertThat(w.name).isEqualTo("30/15 intervals 3×13")
+        assertThat(w.durationSec).isEqualTo(75 * 60)
+        assertThat(w.description).contains("3 sets of 13 × (30 s at 120 % / 15 s easy), 3 min easy between sets.")
+        assertThat(w.segments.filterIsInstance<Segment.Repeat>()).hasSize(3)
+        // 30-min session leaves 17 min (1020 s): 2×9 = 18 × 45 s + 3 min set rest = 990 s fits, 2×10 does not
+        val short = WorkoutTemplates.create(SessionType.ShortIntervals, level = 5, minutes = 30, id = "t", context = "")
+        assertThat(short.durationSec).isEqualTo(1800)
+        assertThat(short.name).isEqualTo("30/15 intervals 2×9")
+        val long = WorkoutTemplates.create(SessionType.LongIntervals, level = 4, minutes = 60, id = "l", context = "")
+        assertThat(long.name).isEqualTo("Long intervals 4×8")
+        assertThat(long.durationSec).isEqualTo(3600)
     }
 
     @Test fun backToBackDaysGetOneHardSession() {
