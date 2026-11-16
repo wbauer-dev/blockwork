@@ -8,10 +8,14 @@ interval workouts, rule-based plan generator, workout import, Strava export. See
 - `./gradlew assembleDebug` / `./gradlew installDebug` – build / install on the USB-connected phone
 - Android SDK at `~/Android/Sdk`, Android Studio via snap. Gradle runs on JDK 25; bytecode target is Java 17.
 
+## Secrets
+Strava client id/secret live in `secrets.properties` (git-ignored, template `secrets.properties.example`, see docs/strava.md).
+Never commit it or print its contents.
+
 ## Modules
 - `:domain` – pure Kotlin/JVM (no Android). Workout model, engine, zones, plan generator, importers. Put logic here.
 - `:ble` – BLE devices (Nordic BLE library), GATT UUIDs, byte parsers/encoders (pure, unit-tested).
-- `:data` – persistence (DataStore, later Room), FIT export, Strava client.
+- `:data` – persistence (DataStore, Room with exported schemas + auto-migrations), FIT export (Garmin FIT SDK), Strava client.
 - `:app` – Compose UI, ViewModels, Hilt wiring, foreground TrainingService.
 
 ## Conventions

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -57,6 +58,7 @@ fun LiveScreen(
     onOpenSettings: () -> Unit,
     onOpenWorkouts: () -> Unit,
     onOpenTraining: () -> Unit,
+    onOpenHistory: () -> Unit,
     viewModel: LiveViewModel = hiltViewModel(),
 ) {
     val session by viewModel.training.state.collectAsStateWithLifecycle()
@@ -77,6 +79,7 @@ fun LiveScreen(
             TopAppBar(
                 title = { Text("IndoorTrain") },
                 actions = {
+                    IconButton(onClick = onOpenHistory) { Icon(Icons.Default.History, "History") }
                     IconButton(onClick = onOpenDevices) { Icon(Icons.Default.Bluetooth, "Devices") }
                     IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, "Settings") }
                 },

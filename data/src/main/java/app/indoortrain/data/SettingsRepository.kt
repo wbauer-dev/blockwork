@@ -22,6 +22,7 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
 data class UserSettings(
     val ftpWatts: Int = DEFAULT_FTP,
     val maxHeartRate: Int? = null,
+    val stravaAutoUpload: Boolean = false,
 ) {
     companion object {
         const val DEFAULT_FTP = 200
@@ -43,6 +44,7 @@ class SettingsRepository @Inject constructor(
         val FTP = intPreferencesKey("ftp_watts")
         val MAX_HR = intPreferencesKey("max_heart_rate")
         val USE_SIMULATION = booleanPreferencesKey("use_simulation")
+        val STRAVA_AUTO_UPLOAD = booleanPreferencesKey("strava_auto_upload")
         fun address(kind: DeviceKind) = stringPreferencesKey("${kind.name}_address")
         fun name(kind: DeviceKind) = stringPreferencesKey("${kind.name}_name")
     }
@@ -53,6 +55,7 @@ class SettingsRepository @Inject constructor(
         UserSettings(
             ftpWatts = p[Keys.FTP] ?: UserSettings.DEFAULT_FTP,
             maxHeartRate = p[Keys.MAX_HR],
+            stravaAutoUpload = p[Keys.STRAVA_AUTO_UPLOAD] ?: false,
         )
     }.distinctUntilChanged()
 
@@ -87,6 +90,10 @@ class SettingsRepository @Inject constructor(
             it.remove(Keys.address(kind))
             it.remove(Keys.name(kind))
         }
+    }
+
+    suspend fun setStravaAutoUpload(enabled: Boolean) {
+        store.edit { it[Keys.STRAVA_AUTO_UPLOAD] = enabled }
     }
 
     suspend fun setUseSimulation(enabled: Boolean) {

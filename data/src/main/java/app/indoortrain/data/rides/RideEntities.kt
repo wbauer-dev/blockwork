@@ -27,6 +27,10 @@ data class RideEntity(
     val intensityFactor: Double? = null,
     val tss: Int? = null,
     val distanceMeters: Int? = null,
+    val stravaUploadId: Long? = null,
+    val stravaActivityId: Long? = null,
+    /** Last Strava upload problem, null if none. */
+    val stravaError: String? = null,
 )
 
 @Entity(

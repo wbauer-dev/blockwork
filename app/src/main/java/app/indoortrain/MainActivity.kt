@@ -3,17 +3,20 @@ package app.indoortrain
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.indoortrain.devices.BluetoothPermissions
+import app.indoortrain.data.strava.StravaRepository
 import app.indoortrain.devices.DeviceManager
 import app.indoortrain.training.TrainingController
 import app.indoortrain.ui.devices.DevicesScreen
@@ -22,6 +25,9 @@ import app.indoortrain.ui.settings.SettingsScreen
 import app.indoortrain.ui.theme.IndoorTrainTheme
 import app.indoortrain.ui.training.TrainingScreen
 import app.indoortrain.ui.editor.WorkoutEditorScreen
+import app.indoortrain.ui.history.HistoryScreen
+import app.indoortrain.ui.history.RideDetailScreen
+import kotlinx.coroutines.launch
 import app.indoortrain.ui.workouts.WorkoutDetailScreen
 import app.indoortrain.ui.workouts.WorkoutListScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -32,6 +38,7 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var deviceManager: DeviceManager
     @Inject lateinit var trainingController: TrainingController
+    @Inject lateinit var strava: StravaRepository
 
     /** Set when opened from the workout notification. */
     private val openTraining = mutableStateOf(false)
@@ -60,6 +67,7 @@ class MainActivity : ComponentActivity() {
                             onOpenSettings = { nav.navigate(Routes.SETTINGS) },
                             onOpenWorkouts = { nav.navigate(Routes.WORKOUTS) },
                             onOpenTraining = { nav.navigate(Routes.TRAINING) { launchSingleTop = true } },
+                            onOpenHistory = { nav.navigate(Routes.HISTORY) },
                         )
                     }
                     composable(Routes.DEVICES) { DevicesScreen(onBack = { nav.popBackStack() }) }
@@ -95,6 +103,12 @@ class MainActivity : ComponentActivity() {
                             },
                         )
                     }
+                    composable(Routes.HISTORY) {
+                        HistoryScreen(onBack = { nav.popBackStack() }, onOpen = { id -> nav.navigate("ride/$id") })
+                    }
+                    composable(Routes.RIDE, arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+                        RideDetailScreen(onBack = { nav.popBackStack() })
+                    }
                     composable(Routes.TRAINING) {
                         TrainingScreen(
                             onBack = { nav.popBackStack(Routes.LIVE, inclusive = false) },
@@ -113,6 +127,20 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_OPEN_TRAINING, false) == true) openTraining.value = true
+        val data = intent?.data
+        if (data != null && data.scheme == "indoortrain" && data.host == "localhost" && data.path == "/strava") {
+            intent.data = null // handle once
+            lifecycleScope.launch {
+                val result = strava.completeAuthorization(
+                    code = data.getQueryParameter("code"),
+                    state = data.getQueryParameter("state"),
+                    scope = data.getQueryParameter("scope"),
+                    error = data.getQueryParameter("error"),
+                )
+                val message = result.fold({ "Connected to Strava" }, { it.message ?: "Strava login failed" })
+                Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     override fun onResume() {
@@ -127,6 +155,8 @@ class MainActivity : ComponentActivity() {
         const val SETTINGS = "settings"
         const val WORKOUTS = "workouts"
         const val TRAINING = "training"
+        const val HISTORY = "history"
+        const val RIDE = "ride/{id}"
         const val WORKOUT = "workout/{id}"
         const val EDITOR = "editor?id={id}&copy={copy}"
 

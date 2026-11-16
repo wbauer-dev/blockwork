@@ -2,6 +2,8 @@ package app.indoortrain.training
 
 import android.content.Context
 import app.indoortrain.data.SettingsRepository
+import app.indoortrain.data.strava.StravaRepository
+import app.indoortrain.data.strava.StravaState
 import app.indoortrain.devices.DeviceManager
 import app.indoortrain.di.ApplicationScope
 import app.indoortrain.domain.Workout
@@ -33,6 +35,7 @@ class TrainingController @Inject constructor(
     private val settings: SettingsRepository,
     private val recorder: RideRecorder,
     private val cuePlayer: CuePlayer,
+    private val strava: StravaRepository,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     private val session = MutableStateFlow<TrainingSession?>(null)
@@ -59,6 +62,7 @@ class TrainingController @Inject constructor(
         )
         cueJob?.cancel()
         cueJob = scope.launch { s.cues.collect(cuePlayer::play) }
+        scope.launch { autoUploadWhenFinished(s) }
         session.value = s
         TrainingService.start(context)
         s.start()
@@ -72,10 +76,23 @@ class TrainingController @Inject constructor(
     fun decreaseIntensity() = session.value?.decreaseIntensity()
     fun stop() = session.value?.stop()
 
+    private suspend fun autoUploadWhenFinished(s: TrainingSession) {
+        val finished = s.state.first { it.phase == SessionPhase.Finished && it.summary != null }
+        val rideId = finished.rideId ?: return
+        val enabled = settings.settings.first().stravaAutoUpload
+        val connected = strava.state.first() is StravaState.Connected
+        // Skip very short rides (aborted starts).
+        if (enabled && connected && (finished.summary?.durationSec ?: 0) >= MIN_UPLOAD_SEC) strava.upload(rideId)
+    }
+
     /** Clears a finished session (after the summary was shown). */
     fun dismiss() {
         if (isActive) return
         cueJob?.cancel()
         session.value = null
+    }
+
+    private companion object {
+        const val MIN_UPLOAD_SEC = 120
     }
 }

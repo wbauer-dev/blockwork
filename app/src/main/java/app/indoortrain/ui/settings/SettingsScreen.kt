@@ -1,5 +1,7 @@
 package app.indoortrain.ui.settings
 
+import android.content.Intent
+import androidx.core.net.toUri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,6 +32,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +45,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.indoortrain.data.SettingsRepository
 import app.indoortrain.data.UserSettings
+import app.indoortrain.data.strava.StravaRepository
+import app.indoortrain.data.strava.StravaState
 import app.indoortrain.devices.DeviceManager
 import app.indoortrain.domain.devices.ConnectionState
 import app.indoortrain.domain.devices.DeviceStatus
@@ -60,7 +66,20 @@ import kotlin.math.roundToInt
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     val devices: DeviceManager,
+    private val strava: StravaRepository,
 ) : ViewModel() {
+
+    val stravaState = strava.state.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StravaState.Disconnected)
+
+    suspend fun stravaAuthorizationUrl(): String = strava.beginAuthorization()
+
+    fun disconnectStrava() {
+        viewModelScope.launch { strava.disconnect() }
+    }
+
+    fun setStravaAutoUpload(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setStravaAutoUpload(enabled) }
+    }
 
     val settings: StateFlow<UserSettings> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserSettings())
@@ -99,6 +118,9 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val trainerStatus by viewModel.devices.trainerStatus.collectAsStateWithLifecycle()
     val capabilities by viewModel.devices.trainerCapabilities.collectAsStateWithLifecycle()
     val ergResult by viewModel.ergResult.collectAsStateWithLifecycle()
+    val stravaState by viewModel.stravaState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -128,6 +150,19 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                     Switch(checked = simulation, onCheckedChange = viewModel::setSimulation)
                 }
             }
+
+            StravaCard(
+                state = stravaState,
+                autoUpload = settings.stravaAutoUpload,
+                onConnect = {
+                    scope.launch {
+                        val url = viewModel.stravaAuthorizationUrl()
+                        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                    }
+                },
+                onDisconnect = viewModel::disconnectStrava,
+                onAutoUpload = viewModel::setStravaAutoUpload,
+            )
 
             ErgTestCard(
                 connected = trainerStatus.connection == ConnectionState.Connected,
@@ -164,6 +199,46 @@ private fun FtpCard(currentFtp: Int, onSave: (String) -> Boolean) {
                     modifier = Modifier.weight(1f),
                 )
                 Button(onClick = { invalid = !onSave(text) }) { Text("Save") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StravaCard(
+    state: StravaState,
+    autoUpload: Boolean,
+    onConnect: () -> Unit,
+    onDisconnect: () -> Unit,
+    onAutoUpload: (Boolean) -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Strava", style = MaterialTheme.typography.titleMedium)
+            when (state) {
+                StravaState.NotConfigured -> Text(
+                    "Not set up: add your Strava API client id and secret to secrets.properties and rebuild " +
+                        "(see docs/strava.md).",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                StravaState.Disconnected -> {
+                    Text("Upload rides to your Strava account.", style = MaterialTheme.typography.bodySmall)
+                    Button(onClick = onConnect) { Text("Connect with Strava") }
+                }
+                is StravaState.Connected -> {
+                    Text("Connected" + (state.athleteName?.let { " as $it" } ?: ""), style = MaterialTheme.typography.bodyMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Upload automatically", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "After each workout (longer than 2 min). Includes power, cadence and heart rate.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Switch(checked = autoUpload, onCheckedChange = onAutoUpload)
+                    }
+                    OutlinedButton(onClick = onDisconnect) { Text("Disconnect") }
+                }
             }
         }
     }

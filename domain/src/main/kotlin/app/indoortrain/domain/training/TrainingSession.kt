@@ -29,6 +29,8 @@ import kotlin.time.TimeSource
 enum class Cue { StepStart, Countdown, Finished }
 
 data class SessionState(
+    /** Database id of the recorded ride; null until recording started. */
+    val rideId: Long?,
     val workoutId: String,
     val workoutName: String,
     val isFtpTest: Boolean,
@@ -220,6 +222,7 @@ class TrainingSession(
         val bike = trainer.bikeData.value
         val next = engine.nextStep
         return SessionState(
+            rideId = rideId,
             workoutId = workout.id,
             workoutName = workout.name,
             isFtpTest = workout.isFtpTest,

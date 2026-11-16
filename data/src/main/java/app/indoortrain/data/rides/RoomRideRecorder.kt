@@ -35,22 +35,6 @@ class RoomRideRecorder @Inject constructor(private val dao: RideDao) : RideRecor
 
     override suspend fun finishRide(rideId: Long, summary: RideSummary, completed: Boolean) {
         val ride = dao.ride(rideId) ?: return
-        dao.updateRide(
-            ride.copy(
-                finished = true,
-                completed = completed,
-                durationSec = summary.durationSec,
-                avgPower = summary.avgPower,
-                maxPower = summary.maxPower,
-                normalizedPower = summary.normalizedPower,
-                avgHeartRate = summary.avgHeartRate,
-                maxHeartRate = summary.maxHeartRate,
-                avgCadence = summary.avgCadence,
-                energyKj = summary.energyKj,
-                intensityFactor = summary.intensityFactor,
-                tss = summary.tss,
-                distanceMeters = summary.distanceMeters,
-            ),
-        )
+        dao.updateRide(ride.withSummary(summary, completed))
     }
 }

@@ -1,8 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.room)
+    alias(libs.plugins.kotlin.serialization)
+}
+
+// Strava API credentials: copy secrets.properties.example to secrets.properties (git-ignored).
+val secrets = Properties().apply {
+    rootProject.file("secrets.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
 
 android {
@@ -11,6 +19,12 @@ android {
 
     defaultConfig {
         minSdk = 31
+        buildConfigField("String", "STRAVA_CLIENT_ID", "\"${secrets.getProperty("STRAVA_CLIENT_ID", "")}\"")
+        buildConfigField("String", "STRAVA_CLIENT_SECRET", "\"${secrets.getProperty("STRAVA_CLIENT_SECRET", "")}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {
@@ -27,6 +41,9 @@ dependencies {
     api(project(":domain"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.datastore.preferences)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
+    implementation(libs.garmin.fit)
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
     implementation(libs.hilt.android)
@@ -34,4 +51,6 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.truth)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
