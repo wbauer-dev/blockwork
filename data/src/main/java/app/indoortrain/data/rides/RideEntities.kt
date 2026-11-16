@@ -32,6 +32,8 @@ data class RideEntity(
     val stravaUploadId: Long? = null,
     val stravaActivityId: Long? = null,
     val stravaError: String? = null,
+    /** Training plan session this ride belongs to (DB v4). */
+    val plannedSessionId: String? = null,
 )
 
 @Entity(

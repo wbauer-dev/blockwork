@@ -5,6 +5,7 @@ import androidx.room.Room
 import app.indoortrain.data.rides.AppDatabase
 import app.indoortrain.data.rides.RideDao
 import app.indoortrain.data.rides.RoomRideRecorder
+import app.indoortrain.data.plans.PlanDao
 import app.indoortrain.data.workouts.WorkoutDao
 import app.indoortrain.domain.training.RideRecorder
 import dagger.Binds
@@ -33,5 +34,8 @@ abstract class DataModule {
 
         @Provides
         fun workoutDao(db: AppDatabase): WorkoutDao = db.workoutDao()
+
+        @Provides
+        fun planDao(db: AppDatabase): PlanDao = db.planDao()
     }
 }

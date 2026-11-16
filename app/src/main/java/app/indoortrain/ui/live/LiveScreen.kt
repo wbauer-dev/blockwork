@@ -13,11 +13,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -35,7 +37,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import app.indoortrain.data.plans.PlanRepository
+import app.indoortrain.data.rides.RideRepository
 import app.indoortrain.devices.DeviceManager
+import app.indoortrain.ui.plan.PlanTodayCard
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import app.indoortrain.domain.training.SessionPhase
 import app.indoortrain.training.TrainingController
 import app.indoortrain.ui.common.BluetoothAccessBanner
@@ -49,7 +57,12 @@ import kotlin.math.roundToInt
 class LiveViewModel @Inject constructor(
     val devices: DeviceManager,
     val training: TrainingController,
-) : ViewModel()
+    plans: PlanRepository,
+    rides: RideRepository,
+) : ViewModel() {
+    val plan = plans.activePlan.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val planRides = rides.planRides.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,8 +72,12 @@ fun LiveScreen(
     onOpenWorkouts: () -> Unit,
     onOpenTraining: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenPlan: () -> Unit,
+    onOpenPlanSession: (String) -> Unit,
     viewModel: LiveViewModel = hiltViewModel(),
 ) {
+    val plan by viewModel.plan.collectAsStateWithLifecycle()
+    val planRides by viewModel.planRides.collectAsStateWithLifecycle()
     val session by viewModel.training.state.collectAsStateWithLifecycle()
     val dm = viewModel.devices
     val hrStatus by dm.heartRateStatus.collectAsStateWithLifecycle()
@@ -100,9 +117,16 @@ fun LiveScreen(
                     )
                 }
             } else {
-                Button(onClick = onOpenWorkouts, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-                    Icon(Icons.Default.FitnessCenter, contentDescription = null)
-                    Text("  Workouts", style = MaterialTheme.typography.titleMedium)
+                PlanTodayCard(plan, planRides, onOpenPlan, onOpenPlanSession)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = onOpenWorkouts, modifier = Modifier.weight(1f).height(56.dp)) {
+                        Icon(Icons.Default.FitnessCenter, contentDescription = null)
+                        Text("  Workouts", style = MaterialTheme.typography.titleMedium)
+                    }
+                    FilledTonalButton(onClick = onOpenPlan, modifier = Modifier.weight(1f).height(56.dp)) {
+                        Icon(Icons.Default.CalendarMonth, contentDescription = null)
+                        Text("  Plan", style = MaterialTheme.typography.titleMedium)
+                    }
                 }
             }
             if (simulation) {

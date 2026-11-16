@@ -18,6 +18,9 @@ import app.indoortrain.devices.DeviceManager
 import app.indoortrain.training.TrainingController
 import app.indoortrain.ui.devices.DevicesScreen
 import app.indoortrain.ui.live.LiveScreen
+import app.indoortrain.ui.plan.PlanScreen
+import app.indoortrain.ui.plan.PlanSessionScreen
+import app.indoortrain.ui.plan.PlanWizardScreen
 import app.indoortrain.ui.settings.SettingsScreen
 import app.indoortrain.ui.theme.IndoorTrainTheme
 import app.indoortrain.ui.training.TrainingScreen
@@ -63,6 +66,8 @@ class MainActivity : ComponentActivity() {
                             onOpenWorkouts = { nav.navigate(Routes.WORKOUTS) },
                             onOpenTraining = { nav.navigate(Routes.TRAINING) { launchSingleTop = true } },
                             onOpenHistory = { nav.navigate(Routes.HISTORY) },
+                            onOpenPlan = { nav.navigate(Routes.PLAN) },
+                            onOpenPlanSession = { id -> nav.navigate(Routes.planSession(id)) },
                         )
                     }
                     composable(Routes.DEVICES) { DevicesScreen(onBack = { nav.popBackStack() }) }
@@ -96,6 +101,25 @@ class MainActivity : ComponentActivity() {
                             onSaved = { id ->
                                 nav.navigate(Routes.workout(id)) { popUpTo(Routes.WORKOUTS) }
                             },
+                        )
+                    }
+                    composable(Routes.PLAN) {
+                        PlanScreen(
+                            onBack = { nav.popBackStack() },
+                            onNewPlan = { nav.navigate(Routes.PLAN_NEW) },
+                            onOpenSession = { id -> nav.navigate(Routes.planSession(id)) },
+                        )
+                    }
+                    composable(Routes.PLAN_NEW) {
+                        PlanWizardScreen(
+                            onBack = { nav.popBackStack() },
+                            onCreated = { nav.navigate(Routes.PLAN) { popUpTo(Routes.LIVE) } },
+                        )
+                    }
+                    composable(Routes.PLAN_SESSION, arguments = listOf(navArgument("id") { type = NavType.StringType })) {
+                        PlanSessionScreen(
+                            onBack = { nav.popBackStack() },
+                            onStarted = { nav.navigate(Routes.TRAINING) { popUpTo(Routes.LIVE) } },
                         )
                     }
                     composable(Routes.HISTORY) {
@@ -136,12 +160,17 @@ class MainActivity : ComponentActivity() {
         const val SETTINGS = "settings"
         const val WORKOUTS = "workouts"
         const val TRAINING = "training"
+        const val PLAN = "plan"
+        const val PLAN_NEW = "plan/new"
+        const val PLAN_SESSION = "plan/session/{id}"
         const val HISTORY = "history"
         const val RIDE = "ride/{id}"
         const val WORKOUT = "workout/{id}"
         const val EDITOR = "editor?id={id}&copy={copy}"
 
         fun workout(id: String) = "workout/${Uri.encode(id)}"
+
+        fun planSession(id: String) = "plan/session/${Uri.encode(id)}"
 
         fun editor(id: String?, copy: Boolean) =
             if (id == null) "editor" else "editor?id=${Uri.encode(id)}&copy=$copy"

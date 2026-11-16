@@ -16,6 +16,7 @@ class RoomRideRecorder @Inject constructor(private val dao: RideDao) : RideRecor
             workoutId = start.workoutId,
             workoutName = start.workoutName,
             ftp = start.ftp,
+            plannedSessionId = start.plannedSessionId,
         ),
     )
 

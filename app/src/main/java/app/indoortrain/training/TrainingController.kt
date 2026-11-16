@@ -46,7 +46,7 @@ class TrainingController @Inject constructor(
     val isActive: Boolean
         get() = state.value?.phase.let { it == SessionPhase.Running || it == SessionPhase.Paused }
 
-    suspend fun start(workout: Workout) {
+    suspend fun start(workout: Workout, plannedSessionId: String? = null) {
         if (isActive) return
         val ftp = settings.settings.first().ftpWatts
         val s = TrainingSession(
@@ -56,6 +56,7 @@ class TrainingController @Inject constructor(
             heartRateMonitor = devices.heartRateMonitor.value,
             recorder = recorder,
             scope = scope,
+            plannedSessionId = plannedSessionId,
         )
         cueJob?.cancel()
         cueJob = scope.launch { s.cues.collect(cuePlayer::play) }

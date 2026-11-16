@@ -24,6 +24,9 @@ interface RideDao {
     @Query("SELECT * FROM rides WHERE id = :id")
     fun observeRide(id: Long): Flow<RideEntity?>
 
+    @Query("SELECT * FROM rides WHERE plannedSessionId IS NOT NULL AND finished = 1")
+    fun observePlanRides(): Flow<List<RideEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSample(sample: RideSampleEntity)
 

@@ -1,11 +1,6 @@
 package app.indoortrain.ui.workouts
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -59,6 +53,7 @@ import app.indoortrain.domain.io.WorkoutJson
 import app.indoortrain.domain.training.WorkoutMetrics
 import app.indoortrain.training.TrainingController
 import app.indoortrain.ui.common.WorkoutProfile
+import app.indoortrain.ui.common.rememberWorkoutStarter
 import app.indoortrain.ui.common.formatDuration
 import app.indoortrain.ui.common.formatMinutes
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -117,20 +112,8 @@ fun WorkoutDetailScreen(
     val item by viewModel.workout.collectAsStateWithLifecycle()
     val settings by viewModel.userSettings.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var confirmWithoutTrainer by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-
-    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        // Workout runs either way; without permission the notification is just hidden.
-        viewModel.start(onStarted)
-    }
-
-    fun launch() {
-        val granted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
-        if (granted) viewModel.start(onStarted) else notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-    }
+    val startWorkout = rememberWorkoutStarter({ viewModel.trainerConnected }) { viewModel.start(onStarted) }
 
     val lib = item
     Scaffold(
@@ -178,7 +161,7 @@ fun WorkoutDetailScreen(
             WorkoutProfile(w.flatten(), Modifier.fillMaxWidth().height(120.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    onClick = { if (viewModel.trainerConnected) launch() else confirmWithoutTrainer = true },
+                    onClick = startWorkout,
                     modifier = Modifier.weight(1f).height(52.dp),
                 ) {
                     Icon(Icons.Default.PlayArrow, null)
@@ -197,15 +180,6 @@ fun WorkoutDetailScreen(
         }
     }
 
-    if (confirmWithoutTrainer) {
-        AlertDialog(
-            onDismissRequest = { confirmWithoutTrainer = false },
-            title = { Text("Trainer not connected") },
-            text = { Text("The workout starts anyway and controls the trainer as soon as it connects.") },
-            confirmButton = { TextButton(onClick = { confirmWithoutTrainer = false; launch() }) { Text("Start anyway") } },
-            dismissButton = { TextButton(onClick = { confirmWithoutTrainer = false }) { Text("Cancel") } },
-        )
-    }
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },

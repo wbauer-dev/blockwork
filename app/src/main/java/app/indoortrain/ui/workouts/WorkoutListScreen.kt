@@ -49,6 +49,7 @@ import app.indoortrain.domain.io.WorkoutImportException
 import app.indoortrain.domain.io.WorkoutImporter
 import app.indoortrain.ui.common.WorkoutProfile
 import app.indoortrain.ui.common.formatMinutes
+import app.indoortrain.ui.common.readTextLimited
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -90,7 +91,7 @@ class WorkoutListViewModel @Inject constructor(
             for (uri in uris) {
                 val name = displayName(uri) ?: "workout"
                 try {
-                    val text = withContext(Dispatchers.IO) { readText(uri) }
+                    val text = withContext(Dispatchers.IO) { readTextLimited(context, uri, WorkoutImporter.MAX_FILE_CHARS) }
                     val result = repository.import(name, text, ftp)
                     imported += result.workout.name
                     ids += result.workout.id
@@ -107,20 +108,6 @@ class WorkoutListViewModel @Inject constructor(
 
     fun dismissReport() {
         _report.value = null
-    }
-
-    private fun readText(uri: Uri): String {
-        val stream = context.contentResolver.openInputStream(uri) ?: throw java.io.IOException("no data")
-        return stream.bufferedReader().use { reader ->
-            val buffer = CharArray(WorkoutImporter.MAX_FILE_CHARS + 1)
-            var total = 0
-            while (total < buffer.size) {
-                val n = reader.read(buffer, total, buffer.size - total)
-                if (n < 0) break
-                total += n
-            }
-            String(buffer, 0, total) // importer rejects files over the limit
-        }
     }
 
     private fun displayName(uri: Uri): String? =

@@ -1,6 +1,6 @@
 # Indoor Cycling App – Project Plan
 
-Status: draft v1 · 2026-11-16 · Phase 0–3 done · Phase 4 implemented (without Strava API), device test pending
+Status: draft v1 · 2026-11-16 · Phase 0–4 done · Phase 5 implemented, device test pending
 
 ## 1. Goal & scope
 

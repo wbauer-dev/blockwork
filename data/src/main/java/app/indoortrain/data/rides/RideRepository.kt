@@ -1,9 +1,11 @@
 package app.indoortrain.data.rides
 
+import app.indoortrain.domain.plan.LinkedRide
 import app.indoortrain.domain.training.RideSample
 import app.indoortrain.domain.training.RideStats
 import app.indoortrain.domain.training.RideSummary
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -13,6 +15,13 @@ class RideRepository @Inject constructor(private val dao: RideDao) {
     val rides: Flow<List<RideEntity>> = dao.observeRides()
 
     fun observe(id: Long): Flow<RideEntity?> = dao.observeRide(id)
+
+    /** Finished rides linked to training-plan sessions. */
+    val planRides: Flow<List<LinkedRide>> = dao.observePlanRides().map { rows ->
+        rows.mapNotNull { r ->
+            r.plannedSessionId?.let { LinkedRide(it, r.id, r.durationSec ?: 0, r.completed) }
+        }
+    }
 
     suspend fun ride(id: Long): RideEntity? = dao.ride(id)
 

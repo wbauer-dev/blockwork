@@ -26,10 +26,14 @@ object WorkoutJson {
         encodeDefaults = true
     }
 
-    fun encode(workout: Workout): String = json.encodeToString(
-        WorkoutFile.serializer(),
-        WorkoutFile(name = workout.name, description = workout.description, segments = workout.segments.map(::toDto)),
-    )
+    fun encode(workout: Workout): String = json.encodeToString(WorkoutFile.serializer(), toFile(workout))
+
+    internal fun toFile(workout: Workout) =
+        WorkoutFile(name = workout.name, description = workout.description, segments = workout.segments.map(::toDto))
+
+    /** Converts and validates an embedded workout (used by the plan format). */
+    internal fun fromFile(file: WorkoutFile, id: String): Workout =
+        Workout(id, file.name, file.description, file.segments.map(::fromDto)).also(WorkoutValidator::validate)
 
     /** Parses and validates; the returned workout gets [id]. */
     fun decode(text: String, id: String): Workout {
@@ -46,7 +50,7 @@ object WorkoutJson {
     }
 
     @Serializable
-    private data class WorkoutFile(
+    internal data class WorkoutFile(
         val format: String = FORMAT,
         val version: Int = VERSION,
         val name: String,
@@ -55,7 +59,7 @@ object WorkoutJson {
     )
 
     @Serializable
-    private sealed class SegmentDto {
+    internal sealed class SegmentDto {
         @Serializable
         @SerialName("steady")
         data class Steady(val duration: Int, val power: Double, val label: String? = null) : SegmentDto()

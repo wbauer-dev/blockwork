@@ -5,6 +5,8 @@ data class RideStart(
     val workoutId: String,
     val workoutName: String,
     val ftp: Int,
+    /** Set when the workout was started from a training plan. */
+    val plannedSessionId: String? = null,
 )
 
 /** Persists rides; implemented by the data layer. */

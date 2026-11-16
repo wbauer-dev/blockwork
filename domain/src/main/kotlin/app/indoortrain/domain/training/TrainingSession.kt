@@ -76,6 +76,7 @@ class TrainingSession(
     private val scope: CoroutineScope,
     private val timeSource: TimeSource = TimeSource.Monotonic,
     private val wallClock: () -> Long = System::currentTimeMillis,
+    private val plannedSessionId: String? = null,
 ) {
     private val engine = WorkoutEngine(workout, ftp)
     private val mutex = Mutex()
@@ -100,7 +101,7 @@ class TrainingSession(
     fun start() {
         if (job != null) return
         job = scope.launch {
-            rideId = recorder.startRide(RideStart(wallClock(), workout.id, workout.name, ftp))
+            rideId = recorder.startRide(RideStart(wallClock(), workout.id, workout.name, ftp, plannedSessionId))
             mutex.withLock {
                 handle(engine.start())
                 updateTarget()
