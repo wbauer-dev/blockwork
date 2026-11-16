@@ -1,0 +1,22 @@
+# Gradle / Android
+.gradle/
+build/
+/local.properties
+/captures
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# IDE
+.idea/
+*.iml
+.kotlin/
+
+# Secrets (Strava client id/secret etc.)
+secrets.properties
+
+# OS
+.DS_Store
