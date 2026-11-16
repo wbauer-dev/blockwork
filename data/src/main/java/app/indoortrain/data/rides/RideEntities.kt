@@ -1,5 +1,6 @@
 package app.indoortrain.data.rides
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -34,6 +35,8 @@ data class RideEntity(
     val stravaError: String? = null,
     /** Training plan session this ride belongs to (DB v4). */
     val plannedSessionId: String? = null,
+    /** Ramp test ride (DB v5); excluded from the FTP check's "ended early" signal. */
+    @ColumnInfo(defaultValue = "0") val isFtpTest: Boolean = false,
 )
 
 @Entity(
@@ -59,4 +62,6 @@ data class RideSampleEntity(
     val heartRate: Int?,
     val targetPower: Int?,
     val stepIndex: Int,
+    /** Intensity setting (1.0 = as planned); null in rides recorded before DB v5. */
+    val intensity: Double? = null,
 )

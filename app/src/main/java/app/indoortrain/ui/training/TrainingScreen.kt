@@ -72,6 +72,12 @@ import app.indoortrain.domain.training.RideSummary
 import app.indoortrain.domain.training.SessionPhase
 import app.indoortrain.domain.training.SessionState
 import app.indoortrain.data.SettingsRepository
+import app.indoortrain.data.rides.RideRepository
+import app.indoortrain.domain.training.FtpCheck
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import java.time.LocalDate
 import app.indoortrain.data.TrainingPage
 import app.indoortrain.data.UserSettings
 import app.indoortrain.training.TrainingController
@@ -96,12 +102,33 @@ import kotlin.math.roundToInt
 class TrainingViewModel @Inject constructor(
     val controller: TrainingController,
     private val settings: SettingsRepository,
+    private val rides: RideRepository,
 ) : ViewModel() {
     val userSettings: StateFlow<UserSettings?> = settings.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _appliedFtp = MutableStateFlow<Int?>(null)
     val appliedFtp: StateFlow<Int?> = _appliedFtp.asStateFlow()
+
+    private val _ftpCheck = MutableStateFlow<FtpCheckUi?>(null)
+    val ftpCheck: StateFlow<FtpCheckUi?> = _ftpCheck.asStateFlow()
+
+    /** Runs the FTP check once per finished ride (the ride must already be saved). */
+    fun runFtpCheck(rideId: Long) {
+        if (_ftpCheck.value?.rideId == rideId) return
+        viewModelScope.launch {
+            val s = settings.settings.first()
+            _ftpCheck.value = FtpCheckUi(rideId, null, s.ftpWatts)
+            val today = LocalDate.now()
+            val result = withContext(Dispatchers.IO) {
+                FtpCheck.analyze(
+                    rides.fingerprintsSince(today.minusDays(FtpCheck.BASELINE_DAYS)),
+                    s.ftpWatts, s.maxHeartRate, today,
+                )
+            }
+            _ftpCheck.value = FtpCheckUi(rideId, result, s.ftpWatts)
+        }
+    }
 
     fun setPage(page: TrainingPage) {
         viewModelScope.launch { settings.setTrainingPage(page) }
@@ -139,7 +166,13 @@ fun TrainingScreen(onBack: () -> Unit, onDone: () -> Unit, viewModel: TrainingVi
             ) {
                 Header(s.workoutName, null, onBack)
                 val applied by viewModel.appliedFtp.collectAsStateWithLifecycle()
-                Summary(s, applied, viewModel::applyFtp, onDone = { c.dismiss(); onDone() })
+                val ftpCheck by viewModel.ftpCheck.collectAsStateWithLifecycle()
+                val rideId = s.rideId
+                // Ramp tests have their own result; other rides get the FTP check once saved.
+                if (!s.isFtpTest && rideId != null && s.summary != null) {
+                    LaunchedEffect(rideId) { viewModel.runFtpCheck(rideId) }
+                }
+                Summary(s, applied, viewModel::applyFtp, ftpCheck, onDone = { c.dismiss(); onDone() })
             }
             else -> Running(
                 s,
@@ -524,7 +557,13 @@ private fun Tile(
 }
 
 @Composable
-private fun Summary(s: SessionState, appliedFtp: Int?, onApplyFtp: (Int) -> Unit, onDone: () -> Unit) {
+private fun Summary(
+    s: SessionState,
+    appliedFtp: Int?,
+    onApplyFtp: (Int) -> Unit,
+    ftpCheck: FtpCheckUi?,
+    onDone: () -> Unit,
+) {
     Text(
         when {
             s.isFtpTest -> "Ramp test finished"
@@ -564,6 +603,7 @@ private fun Summary(s: SessionState, appliedFtp: Int?, onApplyFtp: (Int) -> Unit
                 }
             }
         }
+        if (ftpCheck != null && ftpCheck.rideId == s.rideId) FtpCheckCard(ftpCheck)
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 SummaryLine("Duration", formatDuration(sum.durationSec))

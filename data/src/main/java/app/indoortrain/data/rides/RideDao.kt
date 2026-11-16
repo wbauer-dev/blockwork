@@ -25,6 +25,9 @@ interface RideDao {
     @Query("SELECT * FROM rides WHERE id = :id")
     fun observeRide(id: Long): Flow<RideEntity?>
 
+    @Query("SELECT * FROM rides WHERE finished = 1 AND startedAt >= :fromMillis ORDER BY startedAt")
+    suspend fun finishedRidesSince(fromMillis: Long): List<RideEntity>
+
     @Query("SELECT * FROM rides WHERE plannedSessionId IS NOT NULL AND finished = 1")
     fun observePlanRides(): Flow<List<RideEntity>>
 

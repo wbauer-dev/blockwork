@@ -14,6 +14,8 @@ data class RideSample(
     val heartRateBpm: Int?,
     val targetWatts: Int?,
     val stepIndex: Int,
+    /** Rider's intensity setting (1.0 = as planned); null for rides recorded before it was stored. */
+    val intensity: Double? = null,
 )
 
 data class RideSummary(

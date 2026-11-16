@@ -17,6 +17,7 @@ class RoomRideRecorder @Inject constructor(private val dao: RideDao) : RideRecor
             workoutName = start.workoutName,
             ftp = start.ftp,
             plannedSessionId = start.plannedSessionId,
+            isFtpTest = start.isFtpTest,
         ),
     )
 
@@ -31,6 +32,7 @@ class RoomRideRecorder @Inject constructor(private val dao: RideDao) : RideRecor
             heartRate = sample.heartRateBpm,
             targetPower = sample.targetWatts,
             stepIndex = sample.stepIndex,
+            intensity = sample.intensity,
         ),
     )
 

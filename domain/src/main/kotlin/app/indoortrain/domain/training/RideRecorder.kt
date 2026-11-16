@@ -7,6 +7,7 @@ data class RideStart(
     val ftp: Int,
     /** Set when the workout was started from a training plan. */
     val plannedSessionId: String? = null,
+    val isFtpTest: Boolean = false,
 )
 
 /** Persists rides; implemented by the data layer. */

@@ -117,7 +117,7 @@ class TrainingSession(
     fun start() {
         if (job != null) return
         job = scope.launch {
-            rideId = recorder.startRide(RideStart(wallClock(), workout.id, workout.name, ftp, plannedSessionId))
+            rideId = recorder.startRide(RideStart(wallClock(), workout.id, workout.name, ftp, plannedSessionId, workout.isFtpTest))
             mutex.withLock {
                 handle(engine.start())
                 updateTarget()
@@ -174,6 +174,7 @@ class TrainingSession(
                 heartRateBpm = heartRateMonitor.heartRate.value?.bpm,
                 targetWatts = lastSentTarget,
                 stepIndex = engine.stepIndex,
+                intensity = engine.intensity,
             )
             samples += sample
             rideId?.let { recorder.addSample(it, sample) }
