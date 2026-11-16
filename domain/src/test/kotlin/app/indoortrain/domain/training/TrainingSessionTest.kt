@@ -61,6 +61,10 @@ class TrainingSessionTest {
         assertThat(state.phase).isEqualTo(SessionPhase.Finished)
         assertThat(state.completed).isTrue()
         assertThat(rig.recorder.samples).hasSize(40)
+        // live histories mirror the recorded samples, one entry per second
+        assertThat(state.powerHistory).isEqualTo(rig.recorder.samples.map { it.powerWatts })
+        assertThat(state.heartRateHistory).isEqualTo(rig.recorder.samples.map { it.heartRateBpm })
+        assertThat(state.heartRateHistory.filterNotNull()).isNotEmpty()
         assertThat(rig.recorder.finished!!.second).isTrue()
         assertThat(rig.recorder.finished!!.first.avgHeartRate).isNotNull()
         assertThat(state.summary).isEqualTo(rig.recorder.finished!!.first)

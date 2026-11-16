@@ -1,7 +1,18 @@
 package app.indoortrain.ui.training
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,7 +41,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,11 +54,15 @@ import androidx.compose.ui.platform.LocalConfiguration
 import app.indoortrain.domain.HeartRateZone
 import app.indoortrain.ui.common.color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -54,6 +72,7 @@ import app.indoortrain.domain.training.RideSummary
 import app.indoortrain.domain.training.SessionPhase
 import app.indoortrain.domain.training.SessionState
 import app.indoortrain.data.SettingsRepository
+import app.indoortrain.data.TrainingPage
 import app.indoortrain.data.UserSettings
 import app.indoortrain.training.TrainingController
 import androidx.lifecycle.viewModelScope
@@ -65,6 +84,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import app.indoortrain.ui.common.ConnectedGreen
 import app.indoortrain.ui.common.ConnectingAmber
+import app.indoortrain.ui.common.HeartRateChart
 import app.indoortrain.ui.common.KeepScreenOn
 import app.indoortrain.ui.common.WorkoutProfile
 import app.indoortrain.ui.common.formatDuration
@@ -82,6 +102,10 @@ class TrainingViewModel @Inject constructor(
 
     private val _appliedFtp = MutableStateFlow<Int?>(null)
     val appliedFtp: StateFlow<Int?> = _appliedFtp.asStateFlow()
+
+    fun setPage(page: TrainingPage) {
+        viewModelScope.launch { settings.setTrainingPage(page) }
+    }
 
     fun applyFtp(watts: Int) {
         if (watts !in UserSettings.FTP_RANGE) return
@@ -120,8 +144,10 @@ fun TrainingScreen(onBack: () -> Unit, onDone: () -> Unit, viewModel: TrainingVi
             else -> Running(
                 s,
                 maxHeartRate = settings?.maxHeartRate,
+                savedPage = settings?.trainingPage,
                 modifier = content,
                 onBack = onBack,
+                onPageChange = viewModel::setPage,
                 onPauseResume = { if (s.phase == SessionPhase.Paused) c.resume() else c.pause() },
                 onSkip = { c.skipStep() },
                 onExtend = { c.extendStep() },
@@ -158,13 +184,19 @@ private fun Header(title: String, subtitle: String?, onBack: () -> Unit) {
     }
 }
 
-/** Fits on one phone screen (designed for ~750 dp usable height); power card and chart absorb the rest. */
+/**
+ * Fits on one phone screen (designed for ~750 dp usable height). Header, warnings, the next step
+ * and the controls stay put; the display area between them is a carousel of [TrainingPage]s.
+ * The last page the rider settled on is remembered for the next ride.
+ */
 @Composable
 private fun Running(
     s: SessionState,
     maxHeartRate: Int?,
+    savedPage: TrainingPage?,
     modifier: Modifier,
     onBack: () -> Unit,
+    onPageChange: (TrainingPage) -> Unit,
     onPauseResume: () -> Unit,
     onSkip: () -> Unit,
     onExtend: () -> Unit,
@@ -173,34 +205,31 @@ private fun Running(
     onStop: () -> Unit,
 ) {
     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val tiles = @Composable {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tile(
-                label = s.currentStep.label ?: "Interval",
-                value = formatDuration(s.stepRemainingSec),
-                unit = "",
-                footer = "Step ${s.stepIndex + 1}/${s.steps.size}",
-                modifier = Modifier.weight(1.2f),
-            )
-            val zone = s.heartRateBpm?.let { bpm -> maxHeartRate?.let { HeartRateZone.forBpm(bpm, it) } }
-            Tile(
-                if (zone != null) "Heart rate · Z${zone.number}" else "Heart rate",
-                s.heartRateBpm?.toString(), "bpm",
-                modifier = Modifier.weight(1f),
-                tint = zone?.color(),
-            )
-            Tile("Cadence", s.cadenceRpm?.toString(), "rpm", modifier = Modifier.weight(1f))
+    val pages = TrainingPage.entries
+    val pager = rememberPagerState { pages.size }
+    // Settings load asynchronously: restore the saved page once, then save each page the rider settles on.
+    var restored by remember { mutableStateOf(false) }
+    LaunchedEffect(savedPage) {
+        if (!restored && savedPage != null) {
+            pager.scrollToPage(savedPage.ordinal)
+            restored = true
         }
     }
-    val profile = @Composable { m: Modifier ->
-        WorkoutProfile(
-            steps = s.steps,
-            modifier = m.fillMaxWidth().heightIn(min = 48.dp),
-            progressSec = s.currentStep.startSec + s.stepElapsedSec,
-            powerHistory = s.powerHistory,
-            ftp = s.ftp,
-            intensity = s.intensity,
-        )
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.settledPage }.collect { if (restored) onPageChange(pages[it]) }
+    }
+
+    val carousel = @Composable { m: Modifier ->
+        Column(m, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), pageSpacing = 16.dp) { i ->
+                val page = Modifier.fillMaxSize()
+                when (pages[i]) {
+                    TrainingPage.Numbers -> NumbersPage(s, maxHeartRate, landscape, page)
+                    TrainingPage.Charts -> ChartsPage(s, maxHeartRate, page)
+                }
+            }
+            PageDots(pager, pages)
+        }
     }
     val controls = @Composable {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -235,29 +264,161 @@ private fun Running(
         Header(s.workoutName, "${formatDuration(s.elapsedSec)} · ${formatDuration(s.remainingSec)} left", onBack)
         Warnings(s)
         if (landscape) {
-            // Two columns: numbers left, what's next + controls right.
+            // Carousel left; what's next and the controls right.
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PowerCard(s, Modifier.weight(1f))
-                    tiles()
-                }
+                carousel(Modifier.weight(1.3f))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     NextCard(s)
-                    profile(Modifier.weight(1f))
+                    Spacer(Modifier.weight(1f))
                     controls()
                 }
             }
         } else {
-            PowerCard(s, Modifier.weight(1.4f))
-            tiles()
+            carousel(Modifier.weight(1f))
             NextCard(s)
-            profile(Modifier.weight(1f))
             controls()
         }
     }
 }
 
 private val CompactPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+
+// ---- Carousel pages. To add one: add a TrainingPage entry, then a branch in Running's pager. ----
+
+/** Big power number, step / heart rate / cadence tiles and (portrait) the workout profile. */
+@Composable
+private fun NumbersPage(s: SessionState, maxHeartRate: Int?, landscape: Boolean, modifier: Modifier) {
+    val zone = heartRateZone(s, maxHeartRate)
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        PowerCard(s, Modifier.weight(1.4f))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Tile(
+                label = s.currentStep.label ?: "Interval",
+                value = formatDuration(s.stepRemainingSec),
+                unit = "",
+                footer = "Step ${s.stepIndex + 1}/${s.steps.size}",
+                modifier = Modifier.weight(1.2f),
+            )
+            Tile(
+                if (zone != null) "Heart rate · Z${zone.number}" else "Heart rate",
+                s.heartRateBpm?.toString(), "bpm",
+                modifier = Modifier.weight(1f),
+                tint = zone?.color(),
+            )
+            Tile("Cadence", s.cadenceRpm?.toString(), "rpm", modifier = Modifier.weight(1f))
+        }
+        // Landscape has no room left under the power card; the charts page has the profile.
+        if (!landscape) Profile(s, Modifier.weight(1f))
+    }
+}
+
+/** Compact numbers plus power and heart-rate history on a shared time axis. */
+@Composable
+private fun ChartsPage(s: SessionState, maxHeartRate: Int?, modifier: Modifier) {
+    val zone = heartRateZone(s, maxHeartRate)
+    val cell = Modifier.fillMaxHeight()
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Tile(
+                "Power",
+                s.power3s?.toString(), "W",
+                modifier = cell.weight(1.1f),
+                footer = if (s.targetWatts == null && s.currentStep.freeRide) "Free ride" else "Target ${s.targetWatts ?: "–"}",
+                tint = powerTint(s),
+                valueSize = CompactValue,
+            )
+            Tile(
+                if (zone != null) "HR · Z${zone.number}" else "HR",
+                s.heartRateBpm?.toString(), "bpm",
+                modifier = cell.weight(1f),
+                tint = zone?.color(),
+                valueSize = CompactValue,
+            )
+            Tile("Cadence", s.cadenceRpm?.toString(), "rpm", modifier = cell.weight(1f), valueSize = CompactValue)
+            Tile(
+                s.currentStep.label ?: "Interval",
+                formatDuration(s.stepRemainingSec), "",
+                modifier = cell.weight(1.1f),
+                footer = "Step ${s.stepIndex + 1}/${s.steps.size}",
+                valueSize = CompactValue,
+            )
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            ChartLabel("Power · target")
+            Profile(s, Modifier.weight(1.2f))
+            ChartLabel(if (maxHeartRate != null) "Heart rate · zones" else "Heart rate")
+            HeartRateChart(
+                history = s.heartRateHistory,
+                totalSec = s.steps.lastOrNull()?.endSec ?: s.totalDurationSec,
+                maxHeartRate = maxHeartRate,
+                progressSec = s.currentStep.startSec + s.stepElapsedSec,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** Workout profile with the ridden power and a progress marker. */
+@Composable
+private fun Profile(s: SessionState, modifier: Modifier) {
+    WorkoutProfile(
+        steps = s.steps,
+        modifier = modifier.fillMaxWidth().heightIn(min = 48.dp),
+        progressSec = s.currentStep.startSec + s.stepElapsedSec,
+        powerHistory = s.powerHistory,
+        ftp = s.ftp,
+        intensity = s.intensity,
+    )
+}
+
+/** One dot per page; tapping a dot jumps to that page. */
+@Composable
+private fun PageDots(pager: PagerState, pages: List<TrainingPage>) {
+    val scope = rememberCoroutineScope()
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+        pages.forEachIndexed { i, page ->
+            val selected = pager.currentPage == i
+            Box(
+                Modifier
+                    .size(28.dp)
+                    .clickable(onClickLabel = "Show ${page.title}") { scope.launch { pager.animateScrollToPage(i) } }
+                    .semantics { contentDescription = "${page.title} page" + if (selected) ", shown" else "" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier.size(if (selected) 10.dp else 8.dp).clip(CircleShape).background(
+                        if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    ),
+                )
+            }
+        }
+    }
+}
+
+private fun heartRateZone(s: SessionState, maxHeartRate: Int?): HeartRateZone? =
+    s.heartRateBpm?.let { bpm -> maxHeartRate?.let { HeartRateZone.forBpm(bpm, it) } }
+
+private val CompactValue = 26.sp
+
+@Composable
+private fun ChartLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/** Under / on / over target colouring for the power display; null without a target or reading. */
+@Composable
+private fun powerTint(s: SessionState): Color? {
+    val target = s.targetWatts
+    val power = s.power3s
+    if (target == null || power == null || target <= 0) return null
+    val ratio = power.toDouble() / target
+    return when {
+        ratio < 0.95 -> ConnectingAmber
+        ratio > 1.05 -> MaterialTheme.colorScheme.error
+        else -> ConnectedGreen
+    }
+}
 
 @Composable
 private fun Warnings(s: SessionState) {
@@ -281,16 +442,7 @@ private fun Warnings(s: SessionState) {
 private fun PowerCard(s: SessionState, modifier: Modifier = Modifier) {
     val target = s.targetWatts
     val power = s.power3s
-    val tint: Color? = if (target != null && power != null && target > 0) {
-        val ratio = power.toDouble() / target
-        when {
-            ratio < 0.95 -> ConnectingAmber
-            ratio > 1.05 -> MaterialTheme.colorScheme.error
-            else -> ConnectedGreen
-        }
-    } else {
-        null
-    }
+    val tint = powerTint(s)
     Card(
         modifier.fillMaxWidth(),
         colors = if (tint != null) {
@@ -349,6 +501,7 @@ private fun Tile(
     modifier: Modifier = Modifier,
     footer: String? = null,
     tint: Color? = null,
+    valueSize: TextUnit = 34.sp,
 ) {
     Card(
         modifier,
@@ -360,7 +513,7 @@ private fun Tile(
         ) {
             Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(value ?: "--", fontSize = 34.sp, fontWeight = FontWeight.Bold, lineHeight = 38.sp, maxLines = 1)
+                Text(value ?: "--", fontSize = valueSize, fontWeight = FontWeight.Bold, lineHeight = valueSize * 1.12f, maxLines = 1)
                 if (unit.isNotEmpty()) {
                     Text(" $unit", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 5.dp))
                 }

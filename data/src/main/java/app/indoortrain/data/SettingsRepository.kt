@@ -21,6 +21,12 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
 
 enum class ThemeMode { System, Light, Dark }
 
+/** Pages of the running-workout carousel, in swipe order (stored by name, so they can be reordered). */
+enum class TrainingPage(val title: String) {
+    Numbers("Big numbers"),
+    Charts("Power and heart-rate charts"),
+}
+
 data class UserSettings(
     val ftpWatts: Int = DEFAULT_FTP,
     /** false until the user saved an FTP (or applied a ramp test result). */
@@ -31,6 +37,7 @@ data class UserSettings(
     val cueVoice: Boolean = false,
     val theme: ThemeMode = ThemeMode.System,
     val onboardingDismissed: Boolean = false,
+    val trainingPage: TrainingPage = TrainingPage.Numbers,
 ) {
     companion object {
         const val DEFAULT_FTP = 200
@@ -57,6 +64,7 @@ class SettingsRepository @Inject constructor(
         val CUE_VOICE = booleanPreferencesKey("cue_voice")
         val THEME = stringPreferencesKey("theme")
         val ONBOARDING_DISMISSED = booleanPreferencesKey("onboarding_dismissed")
+        val TRAINING_PAGE = stringPreferencesKey("training_page")
         fun address(kind: DeviceKind) = stringPreferencesKey("${kind.name}_address")
         fun name(kind: DeviceKind) = stringPreferencesKey("${kind.name}_name")
     }
@@ -73,6 +81,8 @@ class SettingsRepository @Inject constructor(
             cueVoice = p[Keys.CUE_VOICE] ?: false,
             theme = p[Keys.THEME]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System,
             onboardingDismissed = p[Keys.ONBOARDING_DISMISSED] ?: false,
+            trainingPage = p[Keys.TRAINING_PAGE]?.let { runCatching { TrainingPage.valueOf(it) }.getOrNull() }
+                ?: TrainingPage.Numbers,
         )
     }.distinctUntilChanged()
 
@@ -104,6 +114,10 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setTheme(mode: ThemeMode) {
         store.edit { it[Keys.THEME] = mode.name }
+    }
+
+    suspend fun setTrainingPage(page: TrainingPage) {
+        store.edit { it[Keys.TRAINING_PAGE] = page.name }
     }
 
     suspend fun dismissOnboarding() {

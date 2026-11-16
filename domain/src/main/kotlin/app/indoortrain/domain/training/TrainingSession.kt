@@ -70,6 +70,8 @@ data class SessionState(
     val controlProblem: ControlResult?,
     /** Recorded power per running second, for the chart. */
     val powerHistory: List<Int?>,
+    /** Heart rate per recorded second (same indexing as [powerHistory]); null where no reading. */
+    val heartRateHistory: List<Int?>,
     val summary: RideSummary?,
     val completed: Boolean,
 ) {
@@ -267,6 +269,7 @@ class TrainingSession(
             heartRateConnected = heartRateMonitor.status.value.connection == ConnectionState.Connected,
             controlProblem = controlProblem,
             powerHistory = samples.map { it.powerWatts },
+            heartRateHistory = samples.map { it.heartRateBpm },
             summary = summary,
             completed = engine.completed,
         )
