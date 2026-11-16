@@ -1,6 +1,6 @@
 # Indoor Cycling App – Project Plan
 
-Status: draft v1 · 2026-11-16 · Phase 0–2 done · next: Phase 3
+Status: draft v1 · 2026-11-16 · Phase 0–2 done · Phase 3 implemented, device test pending
 
 ## 1. Goal & scope
 
@@ -177,6 +177,7 @@ Import works through the Android file picker and "Open with / Share to app". Imp
 - Import `.zwo`, `.erg`/`.mrc` and JSON; parser unit tests with sample files
 - Simple workout editor (add, edit and reorder segments)
 - Ramp FTP test workout with result evaluation
+- Note: whole-plan JSON import moved to Phase 5 (together with the plan model); Phase 3 imports single workouts. "Open with / Share to app" is not done yet; import works through the file picker.
 
 ### Phase 4 – History & Strava
 - Ride history and ride detail with metrics

@@ -11,6 +11,8 @@ data class Workout(
     val name: String,
     val description: String = "",
     val segments: List<Segment>,
+    /** Ramp test: the summary offers an FTP estimate (75 % of best 1-min power). */
+    val isFtpTest: Boolean = false,
 ) {
     val durationSec: Int get() = segments.sumOf { it.durationSec }
 
@@ -26,6 +28,10 @@ data class Workout(
                 }
                 is Segment.Ramp -> {
                     out += Step(t, segment.durationSec, segment.fromFtp, segment.toFtp, segment.label)
+                    t += segment.durationSec
+                }
+                is Segment.FreeRide -> {
+                    out += Step(t, segment.durationSec, 0.0, 0.0, segment.label, freeRide = true)
                     t += segment.durationSec
                 }
                 is Segment.Repeat -> repeat(segment.times) { segment.segments.forEach(::add) }
@@ -52,6 +58,12 @@ sealed interface Segment {
         val label: String? = null,
     ) : Segment
 
+    /** No ERG target: the trainer is released and the rider pedals freely. */
+    data class FreeRide(
+        override val durationSec: Int,
+        val label: String? = null,
+    ) : Segment
+
     data class Repeat(val times: Int, val segments: List<Segment>) : Segment {
         override val durationSec: Int get() = times * segments.sumOf { it.durationSec }
     }
@@ -64,6 +76,7 @@ data class Step(
     val fromFtp: Double,
     val toFtp: Double,
     val label: String? = null,
+    val freeRide: Boolean = false,
 ) {
     val endSec: Int get() = startSec + durationSec
     val isRamp: Boolean get() = fromFtp != toFtp

@@ -38,3 +38,16 @@ class RideStatsTest {
         assertThat(s.tss).isNull()
     }
 }
+
+class BestPowerTest {
+    @Test fun bestOneMinuteAndRampEstimate() {
+        // 5 min easy, then a ramp ending with a hard minute at 350 W
+        val powers = List(300) { 150 } + List(60) { 300 } + List(60) { 350 } + List(10) { 100 }
+        assertThat(RideStats.bestAverage(powers, 60)).isEqualTo(350)
+        assertThat(RideStats.bestAverage(List(59) { 1 }, 60)).isNull()
+        val samples = powers.mapIndexed { i, p -> RideSample(i + 1, i * 1000L, p, 90.0, 30.0, null, null, 0) }
+        val summary = RideStats.summarize(samples, ftp = 250)
+        assertThat(summary.bestPower1Min).isEqualTo(350)
+        assertThat(summary.rampTestFtp).isEqualTo(263) // 0.75 * 350 = 262.5
+    }
+}

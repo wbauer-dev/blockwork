@@ -53,7 +53,21 @@ object BuiltInWorkouts {
         ),
     )
 
-    val all = listOf(ergCheck, fourByFour, sweetSpot3x10, endurance60)
+    /**
+     * Ramp test: +6 % FTP every minute until you can't hold the target, then press End.
+     * New FTP = 75 % of the best 1-minute power.
+     */
+    val rampTest = Workout(
+        id = "builtin-ramp-test",
+        name = "FTP ramp test",
+        description = "Ride until you can no longer hold the target, then press End. " +
+            "Your new FTP is 75 % of your best 1-minute power. Spin easy afterwards.",
+        segments = listOf(Steady(300, 0.45, "Warmup")) +
+            (0 until 25).map { i -> Steady(60, 0.50 + 0.06 * i, "Ramp ${i + 1}") },
+        isFtpTest = true,
+    )
+
+    val all = listOf(ergCheck, rampTest, fourByFour, sweetSpot3x10, endurance60)
 
     fun byId(id: String): Workout? = all.firstOrNull { it.id == id }
 }

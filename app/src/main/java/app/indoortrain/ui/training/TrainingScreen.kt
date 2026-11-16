@@ -49,7 +49,14 @@ import app.indoortrain.domain.devices.ControlResult
 import app.indoortrain.domain.training.RideSummary
 import app.indoortrain.domain.training.SessionPhase
 import app.indoortrain.domain.training.SessionState
+import app.indoortrain.data.SettingsRepository
+import app.indoortrain.data.UserSettings
 import app.indoortrain.training.TrainingController
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import app.indoortrain.ui.common.ConnectedGreen
 import app.indoortrain.ui.common.ConnectingAmber
 import app.indoortrain.ui.common.KeepScreenOn
@@ -60,7 +67,21 @@ import javax.inject.Inject
 import kotlin.math.roundToInt
 
 @HiltViewModel
-class TrainingViewModel @Inject constructor(val controller: TrainingController) : ViewModel()
+class TrainingViewModel @Inject constructor(
+    val controller: TrainingController,
+    private val settings: SettingsRepository,
+) : ViewModel() {
+    private val _appliedFtp = MutableStateFlow<Int?>(null)
+    val appliedFtp: StateFlow<Int?> = _appliedFtp.asStateFlow()
+
+    fun applyFtp(watts: Int) {
+        if (watts !in UserSettings.FTP_RANGE) return
+        viewModelScope.launch {
+            settings.setFtp(watts)
+            _appliedFtp.value = watts
+        }
+    }
+}
 
 @Composable
 fun TrainingScreen(onBack: () -> Unit, onDone: () -> Unit, viewModel: TrainingViewModel = hiltViewModel()) {
@@ -83,7 +104,8 @@ fun TrainingScreen(onBack: () -> Unit, onDone: () -> Unit, viewModel: TrainingVi
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Header(s.workoutName, null, onBack)
-                Summary(s, onDone = { c.dismiss(); onDone() })
+                val applied by viewModel.appliedFtp.collectAsStateWithLifecycle()
+                Summary(s, applied, viewModel::applyFtp, onDone = { c.dismiss(); onDone() })
             }
             else -> Running(
                 s,
@@ -245,7 +267,7 @@ private fun PowerCard(s: SessionState, modifier: Modifier = Modifier) {
             Text("Power (3 s)", style = MaterialTheme.typography.labelLarge)
             Text(power?.toString() ?: "--", fontSize = 84.sp, fontWeight = FontWeight.Bold, lineHeight = 90.sp)
             Text(
-                "Target ${target ?: "–"} W",
+                if (target == null && s.currentStep.freeRide) "Free ride – no ERG" else "Target ${target ?: "–"} W",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -266,7 +288,8 @@ private fun NextCard(s: SessionState) {
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Text(
-                    "${next.label ?: "Interval"} · ${formatDuration(next.durationSec)} @ ${s.nextStepWatts} W" +
+                    "${next.label ?: "Interval"} · ${formatDuration(next.durationSec)} " +
+                        (if (next.freeRide) "free ride" else "@ ${s.nextStepWatts} W") +
                         if (next.isRamp) " (ramp)" else "",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
@@ -298,9 +321,13 @@ private fun Tile(label: String, value: String?, unit: String, modifier: Modifier
 }
 
 @Composable
-private fun Summary(s: SessionState, onDone: () -> Unit) {
+private fun Summary(s: SessionState, appliedFtp: Int?, onApplyFtp: (Int) -> Unit, onDone: () -> Unit) {
     Text(
-        if (s.completed) "Workout complete" else "Workout ended",
+        when {
+            s.isFtpTest -> "Ramp test finished"
+            s.completed -> "Workout complete"
+            else -> "Workout ended"
+        },
         style = MaterialTheme.typography.headlineMedium,
     )
     WorkoutProfile(
@@ -314,12 +341,33 @@ private fun Summary(s: SessionState, onDone: () -> Unit) {
     if (sum == null) {
         Text("Saving…")
     } else {
+        val estimate = sum.rampTestFtp
+        if (s.isFtpTest && estimate != null) {
+            Card(
+                Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Estimated FTP: $estimate W", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "75 % of your best 1-minute power (${sum.bestPower1Min} W). Current FTP: ${s.ftp} W.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    if (appliedFtp == estimate) {
+                        Text("FTP updated to $estimate W.", fontWeight = FontWeight.SemiBold)
+                    } else if (estimate in UserSettings.FTP_RANGE) {
+                        Button(onClick = { onApplyFtp(estimate) }) { Text("Use $estimate W as FTP") }
+                    }
+                }
+            }
+        }
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 SummaryLine("Duration", formatDuration(sum.durationSec))
                 SummaryLine("Average power", sum.avgPower?.let { "$it W" })
                 SummaryLine("Normalized power", sum.normalizedPower?.let { "$it W" })
                 SummaryLine("Max power", sum.maxPower?.let { "$it W" })
+                SummaryLine("Best 1 min", sum.bestPower1Min?.let { "$it W" })
                 SummaryLine("Average heart rate", sum.avgHeartRate?.let { "$it bpm" })
                 SummaryLine("Max heart rate", sum.maxHeartRate?.let { "$it bpm" })
                 SummaryLine("Average cadence", sum.avgCadence?.let { "$it rpm" })

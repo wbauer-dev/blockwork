@@ -1,9 +1,18 @@
 package app.indoortrain.data.rides
 
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import app.indoortrain.data.workouts.WorkoutDao
+import app.indoortrain.data.workouts.WorkoutEntity
 
-@Database(entities = [RideEntity::class, RideSampleEntity::class], version = 1, exportSchema = true)
+@Database(
+    entities = [RideEntity::class, RideSampleEntity::class, WorkoutEntity::class],
+    version = 2,
+    exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun rideDao(): RideDao
+    abstract fun workoutDao(): WorkoutDao
 }

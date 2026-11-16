@@ -29,7 +29,12 @@ data class RideSummary(
     val tss: Int?,
     /** Distance from speed integration, metres. */
     val distanceMeters: Int,
-)
+    /** Best 60 s average power; null for rides under a minute. */
+    val bestPower1Min: Int? = null,
+) {
+    /** Ramp test estimate: 75 % of the best 1-minute power. */
+    val rampTestFtp: Int? get() = bestPower1Min?.let { (it * 0.75).roundToInt() }
+}
 
 object RideStats {
 
@@ -57,6 +62,7 @@ object RideStats {
             intensityFactor = intensityFactor,
             tss = tss,
             distanceMeters = samples.sumOf { (it.speedKmh ?: 0.0) / 3.6 }.roundToInt(),
+            bestPower1Min = bestAverage(samples.map { it.powerWatts ?: 0 }, 60),
         )
     }
 
@@ -72,6 +78,18 @@ object RideStats {
             n++
         }
         return (sum4 / n).pow(0.25).roundToInt()
+    }
+
+    /** Highest mean over any [windowSec] consecutive seconds; null if the ride is shorter. */
+    fun bestAverage(powerPerSecond: List<Int>, windowSec: Int): Int? {
+        if (powerPerSecond.size < windowSec || windowSec <= 0) return null
+        var sum = powerPerSecond.take(windowSec).sum()
+        var best = sum
+        for (i in windowSec until powerPerSecond.size) {
+            sum += powerPerSecond[i] - powerPerSecond[i - windowSec]
+            if (sum > best) best = sum
+        }
+        return (best.toDouble() / windowSec).roundToInt()
     }
 
     private fun List<Int>.averageOrNull(): Int? = takeIf { it.isNotEmpty() }?.average()?.roundToInt()

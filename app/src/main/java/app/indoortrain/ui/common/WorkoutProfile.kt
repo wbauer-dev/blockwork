@@ -12,6 +12,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import app.indoortrain.domain.PowerZone
 import app.indoortrain.domain.Step
 
+private const val FREE_RIDE_HEIGHT = 0.45
+private val FreeRideColor = Color(0xFF607D8B)
+
 /** Coggan zone colours (grey → red). */
 fun PowerZone.color(): Color = when (this) {
     PowerZone.Z1 -> Color(0xFF9E9E9E)
@@ -45,8 +48,8 @@ fun WorkoutProfile(
         fun y(ftpFraction: Double) = size.height - (ftpFraction / maxFtp).toFloat() * size.height
 
         for ((i, step) in steps.withIndex()) {
-            val from = step.fromFtp * intensity
-            val to = step.toFtp * intensity
+            val from = if (step.freeRide) FREE_RIDE_HEIGHT else step.fromFtp * intensity
+            val to = if (step.freeRide) FREE_RIDE_HEIGHT else step.toFtp * intensity
             val path = Path().apply {
                 moveTo(x(step.startSec), size.height)
                 lineTo(x(step.startSec), y(from))
@@ -56,7 +59,8 @@ fun WorkoutProfile(
             }
             val done = progressSec != null && step.endSec <= progressSec
             val alpha = if (progressSec == null || done || i == steps.indexOfFirst { it.endSec > progressSec }) 1f else 0.55f
-            drawPath(path, PowerZone.forFtpFraction((from + to) / 2).color().copy(alpha = alpha))
+            val color = if (step.freeRide) FreeRideColor else PowerZone.forFtpFraction((from + to) / 2).color()
+            drawPath(path, color.copy(alpha = alpha))
         }
 
         if (ftp != null && powerHistory.size > 1) {

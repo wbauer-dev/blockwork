@@ -105,3 +105,30 @@ class TrainingSessionTest {
         assertThat(rig.recorder.samples).hasSize(5)
     }
 }
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class FreeRideSessionTest {
+    @Test fun releasesTrainerDuringFreeRideAndRetakesControl() = runTest {
+        val trainer = SimulatedSmartTrainer(backgroundScope, Random(1))
+        val hr = SimulatedHeartRateMonitor(backgroundScope, Random(1)) { null }
+        val workout = Workout(
+            "fr", "Free ride test",
+            segments = listOf(Segment.Steady(5, 0.5), Segment.FreeRide(5), Segment.Steady(5, 1.0)),
+        )
+        val session = TrainingSession(
+            workout, 200, trainer, hr, FakeRecorder(), backgroundScope,
+            timeSource = testScheduler.timeSource, wallClock = { testScheduler.currentTime },
+        )
+        trainer.connect("SIM")
+        session.start()
+        runCurrent()
+        assertThat(trainer.targetWatts.value).isEqualTo(100)
+        advanceTimeBy(6_000)
+        assertThat(session.state.value.targetWatts).isNull()
+        assertThat(trainer.targetWatts.value).isNull() // released
+        advanceTimeBy(5_000)
+        assertThat(trainer.targetWatts.value).isEqualTo(200)
+        session.stop()
+        advanceTimeBy(2_000)
+    }
+}

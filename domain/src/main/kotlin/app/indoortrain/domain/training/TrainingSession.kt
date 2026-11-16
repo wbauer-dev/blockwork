@@ -31,6 +31,7 @@ enum class Cue { StepStart, Countdown, Finished }
 data class SessionState(
     val workoutId: String,
     val workoutName: String,
+    val isFtpTest: Boolean,
     val ftp: Int,
     val phase: SessionPhase,
     val steps: List<Step>,
@@ -179,7 +180,15 @@ class TrainingSession(
         val connected = trainer.status.value.connection == ConnectionState.Connected
         if (connected && !wasTrainerConnected) lastSentTarget = null
         wasTrainerConnected = connected
-        val target = engine.targetWatts ?: return
+        val target = engine.targetWatts
+        if (target == null) {
+            // Free ride: hand resistance back to the rider once.
+            if (engine.phase == SessionPhase.Running && connected && lastSentTarget != null) {
+                trainer.releaseControl()
+                lastSentTarget = null
+            }
+            return
+        }
         if (!connected || target == lastSentTarget || ticks < retryTargetAtSec) return
         val result = trainer.setTargetPower(target)
         if (result == ControlResult.Success) {
@@ -213,6 +222,7 @@ class TrainingSession(
         return SessionState(
             workoutId = workout.id,
             workoutName = workout.name,
+            isFtpTest = workout.isFtpTest,
             ftp = ftp,
             phase = engine.phase,
             steps = engine.steps,
@@ -223,7 +233,7 @@ class TrainingSession(
             remainingSec = engine.remainingSec,
             totalDurationSec = engine.totalDurationSec,
             targetWatts = engine.targetWatts,
-            nextStepWatts = next?.let { engine.wattsFor(it, 0) },
+            nextStepWatts = next?.let { engine.startWattsFor(it) },
             intensity = engine.intensity,
             power3s = lastPowers.takeIf { it.isNotEmpty() && bike != null }?.average()?.roundToInt(),
             cadenceRpm = bike?.cadenceRpm?.roundToInt(),

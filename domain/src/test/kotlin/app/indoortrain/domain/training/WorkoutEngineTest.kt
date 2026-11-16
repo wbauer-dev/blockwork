@@ -110,3 +110,22 @@ class WorkoutEngineTest {
         assertThat(BuiltInWorkouts.all.map { it.id }).containsNoDuplicates()
     }
 }
+
+class FreeRideEngineTest {
+    @Test fun freeRideHasNoTarget() {
+        val w = app.indoortrain.domain.Workout(
+            "f", "Free",
+            segments = listOf(app.indoortrain.domain.Segment.FreeRide(5), app.indoortrain.domain.Segment.Steady(5, 1.0)),
+        )
+        val e = WorkoutEngine(w, 200).apply { start() }
+        assertThat(e.targetWatts).isNull()
+        assertThat(e.startWattsFor(e.steps[1])).isEqualTo(200)
+        repeat(5) { e.tick() }
+        assertThat(e.targetWatts).isEqualTo(200)
+    }
+
+    @Test fun rampTestIsMarked() {
+        assertThat(BuiltInWorkouts.rampTest.isFtpTest).isTrue()
+        assertThat(BuiltInWorkouts.rampTest.flatten().last().fromFtp).isWithin(1e-9).of(0.50 + 0.06 * 24)
+    }
+}

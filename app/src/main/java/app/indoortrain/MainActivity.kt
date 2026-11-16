@@ -1,15 +1,18 @@
 package app.indoortrain
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import app.indoortrain.devices.BluetoothPermissions
 import app.indoortrain.devices.DeviceManager
 import app.indoortrain.training.TrainingController
@@ -18,6 +21,8 @@ import app.indoortrain.ui.live.LiveScreen
 import app.indoortrain.ui.settings.SettingsScreen
 import app.indoortrain.ui.theme.IndoorTrainTheme
 import app.indoortrain.ui.training.TrainingScreen
+import app.indoortrain.ui.editor.WorkoutEditorScreen
+import app.indoortrain.ui.workouts.WorkoutDetailScreen
 import app.indoortrain.ui.workouts.WorkoutListScreen
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -62,8 +67,31 @@ class MainActivity : ComponentActivity() {
                     composable(Routes.WORKOUTS) {
                         WorkoutListScreen(
                             onBack = { nav.popBackStack() },
-                            onStarted = {
-                                nav.navigate(Routes.TRAINING) { popUpTo(Routes.LIVE) }
+                            onOpen = { id -> nav.navigate(Routes.workout(id)) },
+                            onNew = { nav.navigate(Routes.editor(null, copy = false)) },
+                        )
+                    }
+                    composable(
+                        Routes.WORKOUT,
+                        arguments = listOf(navArgument("id") { type = NavType.StringType }),
+                    ) {
+                        WorkoutDetailScreen(
+                            onBack = { nav.popBackStack() },
+                            onStarted = { nav.navigate(Routes.TRAINING) { popUpTo(Routes.LIVE) } },
+                            onEdit = { id, copy -> nav.navigate(Routes.editor(id, copy)) },
+                        )
+                    }
+                    composable(
+                        Routes.EDITOR,
+                        arguments = listOf(
+                            navArgument("id") { type = NavType.StringType; nullable = true; defaultValue = null },
+                            navArgument("copy") { type = NavType.BoolType; defaultValue = false },
+                        ),
+                    ) {
+                        WorkoutEditorScreen(
+                            onBack = { nav.popBackStack() },
+                            onSaved = { id ->
+                                nav.navigate(Routes.workout(id)) { popUpTo(Routes.WORKOUTS) }
                             },
                         )
                     }
@@ -99,6 +127,13 @@ class MainActivity : ComponentActivity() {
         const val SETTINGS = "settings"
         const val WORKOUTS = "workouts"
         const val TRAINING = "training"
+        const val WORKOUT = "workout/{id}"
+        const val EDITOR = "editor?id={id}&copy={copy}"
+
+        fun workout(id: String) = "workout/${Uri.encode(id)}"
+
+        fun editor(id: String?, copy: Boolean) =
+            if (id == null) "editor" else "editor?id=${Uri.encode(id)}&copy=$copy"
     }
 
     companion object {

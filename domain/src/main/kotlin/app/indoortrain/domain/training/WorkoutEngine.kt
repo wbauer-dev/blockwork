@@ -59,12 +59,15 @@ class WorkoutEngine(val workout: Workout, val ftp: Int) {
     /** ERG target for the trainer; null when nothing should be controlled. */
     val targetWatts: Int?
         get() = when (phase) {
-            SessionPhase.Running -> wattsFor(currentStep, stepElapsedSec)
+            SessionPhase.Running -> if (currentStep.freeRide) null else wattsFor(currentStep, stepElapsedSec)
             SessionPhase.Paused -> (PAUSE_FTP_FRACTION * ftp).roundToInt()
             else -> null
         }
 
     fun wattsFor(step: Step, offsetSec: Int): Int = (step.targetFtpAt(offsetSec) * ftp * intensity).roundToInt()
+
+    /** Target at the start of [step]; null for free ride. */
+    fun startWattsFor(step: Step): Int? = if (step.freeRide) null else wattsFor(step, 0)
 
     fun start(): List<EngineEvent> {
         if (phase != SessionPhase.Ready) return emptyList()
