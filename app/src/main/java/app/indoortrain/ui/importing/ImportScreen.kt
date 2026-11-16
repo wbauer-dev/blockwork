@@ -90,7 +90,8 @@ class ImportViewModel @Inject constructor(
 
     private suspend fun process(request: ExternalImport): ImportState = try {
         val (name, text) = when (request) {
-            is ExternalImport.FromText -> "shared.json" to request.text
+            // No file name: the importer detects the format from the content.
+            is ExternalImport.FromText -> "shared" to request.text
             is ExternalImport.FromUri -> withContext(Dispatchers.IO) {
                 (displayName(context, request.uri) ?: "file") to readTextLimited(context, request.uri, WorkoutImporter.MAX_FILE_CHARS)
             }

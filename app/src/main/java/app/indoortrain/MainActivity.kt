@@ -75,7 +75,8 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(openImport.value) {
                     if (openImport.value) {
                         openImport.value = false
-                        nav.navigate(Routes.IMPORT) { launchSingleTop = true }
+                        // New screen instance per file, also when an import screen is already open.
+                        nav.navigate(Routes.IMPORT) { popUpTo(Routes.IMPORT) { inclusive = true } }
                     }
                 }
                 NavHost(navController = nav, startDestination = Routes.LIVE) {
