@@ -58,6 +58,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -360,16 +362,17 @@ private fun ChartsPage(s: SessionState, maxHeartRate: Int?, modifier: Modifier) 
                 tint = powerTint(s),
                 valueSize = CompactValue,
             )
-            // Narrow tiles: units go under the number, "107 bpm" does not fit on one line.
+            // "107 bpm" does not fit these narrow tiles; units always go under the number so the row
+            // height does not jump when heart rate or cadence reaches three digits.
             Tile(
                 if (zone != null) "HR · Z${zone.number}" else "HR",
-                s.heartRateBpm?.toString(), "",
+                s.heartRateBpm?.toString(), "bpm",
                 modifier = cell.weight(1f),
-                footer = "bpm",
                 tint = zone?.color(),
                 valueSize = CompactValue,
+                unitBelow = true,
             )
-            Tile("Cadence", s.cadenceRpm?.toString(), "", modifier = cell.weight(1f), footer = "rpm", valueSize = CompactValue)
+            Tile("Cadence", s.cadenceRpm?.toString(), "rpm", modifier = cell.weight(1f), valueSize = CompactValue, unitBelow = true)
             Tile(
                 s.currentStep.label ?: "Interval",
                 formatDuration(s.stepRemainingSec), "",
@@ -537,6 +540,7 @@ private fun Tile(
     footer: String? = null,
     tint: Color? = null,
     valueSize: TextUnit = 34.sp,
+    unitBelow: Boolean = false,
 ) {
     Card(
         modifier,
@@ -547,13 +551,50 @@ private fun Tile(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(value ?: "--", fontSize = valueSize, fontWeight = FontWeight.Bold, lineHeight = valueSize * 1.12f, maxLines = 1)
-                if (unit.isNotEmpty()) {
-                    Text(" $unit", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 5.dp))
-                }
-            }
+            ValueWithUnit(value ?: "--", unit, valueSize, unitBelow)
             footer?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+}
+
+/**
+ * Value with its unit on the same baseline; the unit moves under the value when both do not fit
+ * the width ("1150 W" in a narrow tile), or always with [unitBelow].
+ */
+@Composable
+private fun ValueWithUnit(value: String, unit: String, valueSize: TextUnit, unitBelow: Boolean) {
+    val valueText = @Composable {
+        Text(value, fontSize = valueSize, fontWeight = FontWeight.Bold, lineHeight = valueSize * 1.12f, maxLines = 1, softWrap = false)
+    }
+    if (unit.isEmpty()) {
+        valueText()
+        return
+    }
+    Layout(
+        content = {
+            valueText()
+            Text(unit, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false)
+        },
+    ) { measurables, constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val v = measurables[0].measure(loose)
+        val u = measurables[1].measure(loose)
+        val gap = 3.dp.roundToPx()
+        if (!unitBelow && v.width + gap + u.width <= constraints.maxWidth) {
+            val baseline = maxOf(v[FirstBaseline], u[FirstBaseline])
+            val vy = baseline - v[FirstBaseline]
+            val uy = baseline - u[FirstBaseline]
+            val width = v.width + gap + u.width
+            layout(width, maxOf(vy + v.height, uy + u.height)) {
+                v.place(0, vy)
+                u.place(v.width + gap, uy)
+            }
+        } else {
+            val width = maxOf(v.width, u.width)
+            layout(width, v.height + u.height) {
+                v.place((width - v.width) / 2, 0)
+                u.place((width - u.width) / 2, v.height)
+            }
         }
     }
 }

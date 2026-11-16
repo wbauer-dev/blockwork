@@ -40,6 +40,7 @@ import androidx.lifecycle.viewModelScope
 import app.indoortrain.data.rides.RideEntity
 import app.indoortrain.data.rides.RideRepository
 import app.indoortrain.ui.common.formatDuration
+import app.indoortrain.ui.common.plural
 import dagger.hilt.android.lifecycle.HiltViewModel
 import app.indoortrain.domain.training.RideLoad
 import app.indoortrain.domain.training.TrainingLoad
@@ -134,7 +135,7 @@ fun HistoryScreen(onBack: () -> Unit, onOpen: (Long) -> Unit, viewModel: History
         val running = viewModel.workoutRunning
         AlertDialog(
             onDismissRequest = { confirmDeleteAll = false },
-            title = { Text(if (running) "Workout in progress" else "Delete all ${rides.size} rides?") },
+            title = { Text(if (running) "Workout in progress" else "Delete all ${plural(rides.size, "ride")}?") },
             text = {
                 Text(
                     if (running) {

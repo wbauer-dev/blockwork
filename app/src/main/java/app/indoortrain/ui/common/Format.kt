@@ -14,3 +14,9 @@ fun formatMinutes(totalSec: Int): String {
     val min = (totalSec + 30) / 60
     return if (min >= 60) "${min / 60} h ${min % 60} min" else "$min min"
 }
+
+/** English noun for a count: (1, "ride") -> "ride", (3, "ride") -> "rides". */
+fun noun(n: Int, word: String): String = if (n == 1) word else "${word}s"
+
+/** (1, "ride") -> "1 ride", (3, "ride") -> "3 rides". */
+fun plural(n: Int, word: String): String = "$n ${noun(n, word)}"

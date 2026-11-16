@@ -11,6 +11,7 @@ import app.indoortrain.data.SettingsRepository
 import app.indoortrain.data.UserSettings
 import app.indoortrain.di.ApplicationScope
 import app.indoortrain.domain.training.Cue
+import app.indoortrain.ui.common.plural
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -104,7 +105,5 @@ class CuePlayer @Inject constructor(
                 else -> duration + (label?.let { ", $it" } ?: "")
             }
         }
-
-        private fun plural(n: Int, unit: String) = if (n == 1) "1 $unit" else "$n ${unit}s"
     }
 }

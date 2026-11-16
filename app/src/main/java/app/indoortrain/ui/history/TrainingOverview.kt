@@ -39,6 +39,8 @@ import app.indoortrain.domain.training.PeriodTotals
 import app.indoortrain.domain.training.TrainingLoad
 import app.indoortrain.domain.training.TrainingOverview
 import app.indoortrain.domain.training.WeekLoad
+import app.indoortrain.ui.common.noun
+import app.indoortrain.ui.common.plural
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -63,13 +65,13 @@ private fun ThisWeekCard(o: TrainingOverview) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("This week", style = MaterialTheme.typography.titleMedium)
             Row {
-                Stat("${o.thisWeek.rides}", if (o.thisWeek.rides == 1) "ride" else "rides", "last wk ${o.lastWeek.rides}", Modifier.weight(1f))
+                Stat("${o.thisWeek.rides}", noun(o.thisWeek.rides, "ride"), "last wk ${o.lastWeek.rides}", Modifier.weight(1f))
                 Stat(formatHours(o.thisWeek.durationSec), "time", "last wk ${formatHours(o.lastWeek.durationSec)}", Modifier.weight(1.2f))
                 Stat("${o.thisWeek.tss}", "TSS", "last wk ${o.lastWeek.tss}", Modifier.weight(1f))
                 Stat(formatKj(o.thisWeek.energyKj), "kJ", "last wk ${formatKj(o.lastWeek.energyKj)}", Modifier.weight(1.1f))
             }
             Text(
-                "All time: ${rides(o.allTime.rides)} · ${formatHours(o.allTime.durationSec)} · " +
+                "All time: ${plural(o.allTime.rides, "ride")} · ${formatHours(o.allTime.durationSec)} · " +
                     "${o.allTime.tss} TSS · ${formatKj(o.allTime.energyKj)} kJ",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -128,7 +130,7 @@ private fun WeeklyLoadCard(weeks: List<WeekLoad>) {
                 val t = w.totals
                 Text(
                     (if (selected == weeks.lastIndex) "This week" else "Week of ${w.monday.format(WeekFormat)}") +
-                        " · ${t.tss} TSS · ${formatHours(t.durationSec)} · ${rides(t.rides)}",
+                        " · ${t.tss} TSS · ${formatHours(t.durationSec)} · ${plural(t.rides, "ride")}",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -249,8 +251,6 @@ private fun formatHours(sec: Int): String {
     val min = (sec + 30) / 60
     return "%d:%02d h".format(min / 60, min % 60)
 }
-
-private fun rides(n: Int) = if (n == 1) "1 ride" else "$n rides"
 
 private fun formatKj(kj: Int): String = "%,d".format(kj)
 
