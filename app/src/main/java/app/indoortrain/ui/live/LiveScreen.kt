@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -12,8 +13,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -23,33 +26,40 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.indoortrain.devices.DeviceManager
+import app.indoortrain.domain.training.SessionPhase
+import app.indoortrain.training.TrainingController
 import app.indoortrain.ui.common.BluetoothAccessBanner
 import app.indoortrain.ui.common.DeviceStatusCard
+import app.indoortrain.ui.common.KeepScreenOn
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
 @HiltViewModel
-class LiveViewModel @Inject constructor(val devices: DeviceManager) : ViewModel()
+class LiveViewModel @Inject constructor(
+    val devices: DeviceManager,
+    val training: TrainingController,
+) : ViewModel()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveScreen(
     onOpenDevices: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenWorkouts: () -> Unit,
+    onOpenTraining: () -> Unit,
     viewModel: LiveViewModel = hiltViewModel(),
 ) {
+    val session by viewModel.training.state.collectAsStateWithLifecycle()
     val dm = viewModel.devices
     val hrStatus by dm.heartRateStatus.collectAsStateWithLifecycle()
     val trainerStatus by dm.trainerStatus.collectAsStateWithLifecycle()
@@ -78,6 +88,20 @@ fun LiveScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             BluetoothAccessBanner(permissions, btOn, simulation, dm::onPermissionsChanged)
+            val running = session
+            if (running != null) {
+                Button(onClick = onOpenTraining, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        if (running.phase == SessionPhase.Finished) "Workout finished – show summary"
+                        else "Workout running: ${running.workoutName} – open",
+                    )
+                }
+            } else {
+                Button(onClick = onOpenWorkouts, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                    Icon(Icons.Default.FitnessCenter, contentDescription = null)
+                    Text("  Workouts", style = MaterialTheme.typography.titleMedium)
+                }
+            }
             if (simulation) {
                 AssistChip(onClick = onOpenSettings, label = { Text("Simulation mode – synthetic data") })
             }
@@ -127,14 +151,5 @@ private fun MetricTile(
                 Text(unit, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 6.dp))
             }
         }
-    }
-}
-
-@Composable
-private fun KeepScreenOn() {
-    val view = LocalView.current
-    DisposableEffect(view) {
-        view.keepScreenOn = true
-        onDispose { view.keepScreenOn = false }
     }
 }

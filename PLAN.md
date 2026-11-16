@@ -1,6 +1,6 @@
 # Indoor Cycling App – Project Plan
 
-Status: draft v1 · 2026-11-16 · Phase 0 + 1 done (device facts in docs/devices.md) · next: Phase 2
+Status: draft v1 · 2026-11-16 · Phase 0–2 done · next: Phase 3
 
 ## 1. Goal & scope
 
