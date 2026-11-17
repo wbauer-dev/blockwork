@@ -16,7 +16,7 @@ import app.indoortrain.domain.HeartRateZone
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
-private val HeartRateLine = Color(0xFFD32F2F)
+internal val HeartRateLine = Color(0xFFD32F2F)
 
 /**
  * Heart rate over the ride, on the same time axis as [WorkoutProfile] (x = second / [totalSec]),
