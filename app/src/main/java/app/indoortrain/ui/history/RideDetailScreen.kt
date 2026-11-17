@@ -30,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -67,6 +68,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 @HiltViewModel
 class RideDetailViewModel @Inject constructor(
@@ -196,6 +198,7 @@ private fun RideCharts(samples: List<RideSample>, ftp: Int, maxHeartRate: Int?) 
     val seconds = remember(samples) { samples.map { it.elapsedSec } }
     val power = remember(samples) { samples.map { it.powerWatts } }
     val target = remember(samples) { samples.map { it.targetWatts } }
+    val targetColors = remember(samples, ftp) { stepColors(samples, ftp) }
     val heartRate = remember(samples) { samples.map { it.heartRateBpm } }
 
     // A little headroom above the highest value (FTP included, so its line is always visible).
@@ -205,7 +208,7 @@ private fun RideCharts(samples: List<RideSample>, ftp: Int, maxHeartRate: Int?) 
         RideChart(
             seconds = seconds,
             line = ChartLine(power, MaterialTheme.colorScheme.onSurface),
-            area = ChartArea(target) { watts -> PowerZone.forFtpFraction(watts / ftp).color().copy(alpha = 0.6f) },
+            area = ChartArea(target, targetColors),
             rule = ChartRule(ftp, "FTP $ftp W"),
             yRange = 0..wattTop,
             yStep = niceStep(wattTop, maxTicks = 4),
@@ -227,11 +230,27 @@ private fun RideCharts(samples: List<RideSample>, ftp: Int, maxHeartRate: Int?) 
                 line = ChartLine(heartRate, HeartRateLine),
                 bands = bands,
                 yRange = lo..hi,
-                yStep = niceStep(hi - lo, maxTicks = 4),
+                yStep = niceStep(hi - lo, maxTicks = 5),
                 modifier = Modifier.fillMaxWidth().height(140.dp),
             )
         }
     }
+}
+
+/**
+ * Each sample gets the zone colour of its step's median target, like the blocks of the workout profile.
+ * Median, not mean: a sample stores the target last sent to the trainer, so a step's first second can
+ * still carry the previous step's target. Rounded to whole percent because targets are whole watts
+ * (55 % of 250 W is stored as 138 W).
+ */
+private fun stepColors(samples: List<RideSample>, ftp: Int): List<Color> {
+    val byStep = samples.groupBy { it.stepIndex }.mapValues { (_, s) ->
+        val targets = s.mapNotNull { it.targetWatts }.sorted()
+        if (targets.isEmpty()) return@mapValues Color.Transparent
+        val percent = (targets[targets.size / 2] * 100.0 / ftp).roundToInt()
+        PowerZone.forFtpFraction(percent / 100.0).color().copy(alpha = 0.6f)
+    }
+    return samples.map { byStep.getValue(it.stepIndex) }
 }
 
 @Composable

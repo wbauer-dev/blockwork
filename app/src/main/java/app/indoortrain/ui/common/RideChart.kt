@@ -23,8 +23,8 @@ import kotlin.math.pow
 /** The main series, drawn as a line; null values break it. */
 class ChartLine(val values: List<Int?>, val color: Color)
 
-/** A step area under [values] (e.g. the target power), each column filled with [colorOf] its value. */
-class ChartArea(val values: List<Int?>, val colorOf: (Double) -> Color)
+/** A filled area under [values] (e.g. the target power), coloured per sample by [colors]. */
+class ChartArea(val values: List<Int?>, val colors: List<Color>)
 
 /** A horizontal background band between two y values (e.g. a heart-rate zone). */
 class ChartBand(val from: Double, val to: Double, val color: Color)
@@ -74,14 +74,7 @@ fun RideChart(
             if (to > from) drawRect(band.color, Offset(left, y(to)), Size(right - left, y(from) - y(to)))
         }
 
-        area?.let {
-            val points = columns(seconds, it.values, ::x)
-            points.forEachIndexed { i, p ->
-                val v = p.value ?: return@forEachIndexed
-                val end = points.getOrNull(i + 1)?.x ?: right
-                drawRect(it.colorOf(v), Offset(p.x, y(v)), Size(end - p.x, bottom - y(v)))
-            }
-        }
+        area?.let { drawArea(it, seconds, ::x, ::y, right, bottom) }
 
         // Horizontal gridlines with value labels.
         var tick = ceil(lo / yStep) * yStep
@@ -137,17 +130,48 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRule(
     drawText(text, topLeft = Offset(right - text.size.width - 2.dp.toPx(), (py - text.size.height).coerceAtLeast(0f)))
 }
 
-private class ColumnPoint(val x: Float, val value: Double?)
+/** One closed path per run of equal colour, so neighbouring columns join without seams. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawArea(
+    area: ChartArea, seconds: List<Int>, x: (Int) -> Float, y: (Double) -> Float, right: Float, bottom: Float,
+) {
+    val points = columns(seconds, area.values, x, area.colors)
+    var i = 0
+    while (i < points.size) {
+        val color = points[i].color
+        if (points[i].value == null || color == null) {
+            i++
+            continue
+        }
+        val path = Path().apply { moveTo(points[i].x, bottom) }
+        var j = i
+        while (j < points.size && points[j].value != null && points[j].color == color) {
+            val v = points[j].value!!
+            val end = points.getOrNull(j + 1)?.x ?: right
+            path.lineTo(points[j].x, y(v))
+            path.lineTo(end, y(v))
+            j++
+        }
+        path.lineTo(points.getOrNull(j)?.x ?: right, bottom)
+        path.close()
+        drawPath(path, color)
+        i = j
+    }
+}
+
+private class ColumnPoint(val x: Float, val value: Double?, val color: Color? = null)
 
 /** One point per pixel column: the average of the samples that fall into it (null if none has a value). */
-private fun columns(seconds: List<Int>, values: List<Int?>, x: (Int) -> Float): List<ColumnPoint> {
+private fun columns(
+    seconds: List<Int>, values: List<Int?>, x: (Int) -> Float, colors: List<Color>? = null,
+): List<ColumnPoint> {
     val out = ArrayList<ColumnPoint>()
     var column = Int.MIN_VALUE
     var startX = 0f
+    var color: Color? = null
     var sum = 0.0
     var n = 0
     fun flush() {
-        if (column != Int.MIN_VALUE) out += ColumnPoint(startX, if (n > 0) sum / n else null)
+        if (column != Int.MIN_VALUE) out += ColumnPoint(startX, if (n > 0) sum / n else null, color)
     }
     for (i in 0 until minOf(seconds.size, values.size)) {
         val px = x(seconds[i])
@@ -155,6 +179,7 @@ private fun columns(seconds: List<Int>, values: List<Int?>, x: (Int) -> Float): 
             flush()
             column = px.toInt()
             startX = px
+            color = colors?.getOrNull(i)
             sum = 0.0
             n = 0
         }
