@@ -8,6 +8,21 @@ An Android app for structured indoor cycling. It controls a smart trainer in **E
 
 **[Install the app →](docs/INSTALL.md)**
 
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/training-numbers.png" width="260" alt="Training screen with power against target, interval countdown, heart rate, cadence and workout profile"><br><sub><b>Training</b>: big numbers and profile</sub></td>
+    <td align="center"><img src="docs/screenshots/training-charts.png" width="260" alt="Training screen charts page with power over target blocks and heart rate over zone bands"><br><sub><b>Training</b>: power and heart-rate charts</sub></td>
+    <td align="center"><img src="docs/screenshots/ride-detail.png" width="260" alt="Ride history detail with power and heart-rate charts, FTP line and metrics"><br><sub><b>History</b>: charts and metrics per ride</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/home.png" width="260" alt="Home screen with today's planned workout and live sensor readings"><br><sub><b>Home</b>: today's session and live sensors</sub></td>
+    <td align="center"><img src="docs/screenshots/workout.png" width="260" alt="Imported workout with zone-coloured profile, IF and TSS"><br><sub><b>Workouts</b>: imported .zwo with profile</sub></td>
+    <td align="center"><img src="docs/screenshots/plan.png" width="260" alt="8-week FTP build plan with weekly load and scheduled sessions"><br><sub><b>Plan</b>: 8-week FTP build</sub></td>
+  </tr>
+</table>
+
+<sub>Screenshots taken in simulation mode – all values are synthetic.</sub>
+
 ## Features
 
 - **Devices:** any Bluetooth heart rate strap (standard Heart Rate Service) and any smart trainer with **FTMS** (Fitness Machine Service). Auto-reconnect with backoff; a dropout during a workout doesn't stop it.
@@ -22,7 +37,7 @@ An Android app for structured indoor cycling. It controls a smart trainer in **E
   - Blocks of build weeks followed by a recovery week, with an FTP test in week 1 and in every recovery week.
   - Progressive intervals and never two hard days in a row.
   - Plans can be exported and imported as JSON.
-- **History:** charts and metrics (NP, IF, TSS, kJ). **FIT export** for manual upload to Strava, Garmin Connect, intervals.icu and others.
+- **History:** power and heart-rate charts with zones and FTP line, plus metrics (NP, IF, TSS, kJ). **FIT export** for manual upload to Strava, Garmin Connect, intervals.icu and others.
 - **Simulation mode:** a simulated trainer and heart rate strap for trying the app without hardware.
 
 Tested with a Polar H9 and a Wahoo KICKR Core on Android 17.
