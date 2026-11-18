@@ -187,7 +187,11 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             ThemeCard(settings.theme, viewModel::setTheme)
 
             Card(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
                     Column(Modifier.weight(1f)) {
                         Text("Simulation mode", style = MaterialTheme.typography.titleMedium)
                         Text(
@@ -331,9 +335,10 @@ private fun AutoStartPauseCard(settings: UserSettings, onAutoStart: (Boolean) ->
     }
 }
 
+/** Text on the left, switch on the right; the gap keeps wrapped text clear of the switch on narrow phones. */
 @Composable
-private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+internal fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(subtitle, style = MaterialTheme.typography.bodySmall)

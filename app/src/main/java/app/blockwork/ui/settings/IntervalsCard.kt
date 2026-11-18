@@ -12,7 +12,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -148,17 +147,13 @@ fun IntervalsCard(notify: (String) -> Unit, viewModel: IntervalsViewModel = hilt
                     a.athleteName?.let { "Connected as $it" } ?: "Connected",
                     style = MaterialTheme.typography.bodyLarge,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Upload rides automatically", style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            "After each ride of ${IntervalsUploads.MIN_AUTO_UPLOAD_SEC / 60} minutes or more; waits for a " +
-                                "network connection. Any ride can also be uploaded from its ride screen.",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Switch(checked = a.autoUpload, onCheckedChange = viewModel::setAutoUpload)
-                }
+                SwitchRow(
+                    title = "Upload rides automatically",
+                    subtitle = "After each ride of ${IntervalsUploads.MIN_AUTO_UPLOAD_SEC / 60} minutes or more; waits " +
+                        "for a network connection. Any ride can also be uploaded from its ride screen.",
+                    checked = a.autoUpload,
+                    onChange = viewModel::setAutoUpload,
+                )
                 OutlinedButton(onClick = { viewModel.disconnect(); notify("Disconnected from intervals.icu") }) {
                     Text("Disconnect")
                 }
