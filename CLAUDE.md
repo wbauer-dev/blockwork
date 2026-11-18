@@ -1,7 +1,8 @@
 # Blockwork
 
 Android app for structured indoor cycling: Polar H9 (BLE Heart Rate Service) + Wahoo KICKR Core (FTMS, ERG mode only),
-interval workouts, rule-based plan generator, workout import, FIT export. No network access (no INTERNET permission). See [PLAN.md](PLAN.md) for scope and phases.
+interval workouts, rule-based plan generator, workout import, FIT export, optional intervals.icu upload. The INTERNET
+permission is used **only** for intervals.icu (personal API key, opt-in); add no other network access. See [PLAN.md](PLAN.md) for scope and phases.
 
 ## Build & test
 - `./gradlew test` – all JVM unit tests (domain + ble parsers)

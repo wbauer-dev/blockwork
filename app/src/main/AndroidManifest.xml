@@ -16,6 +16,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Only for uploading rides to intervals.icu, after the user connected an API key -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".BlockworkApp"
         android:dataExtractionRules="@xml/data_extraction_rules"

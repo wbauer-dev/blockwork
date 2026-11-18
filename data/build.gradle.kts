@@ -28,6 +28,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.datastore.preferences)
     implementation(libs.garmin.fit)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
     implementation(libs.hilt.android)

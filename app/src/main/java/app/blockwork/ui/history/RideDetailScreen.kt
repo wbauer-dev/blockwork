@@ -1,5 +1,11 @@
 package app.blockwork.ui.history
 
+import android.content.Intent
+import android.net.Uri
+import app.blockwork.data.intervals.IntervalsAccountStore
+import app.blockwork.data.intervals.IntervalsUploadState
+import app.blockwork.upload.IntervalsUploads
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -75,6 +81,8 @@ class RideDetailViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val rides: RideRepository,
     settings: SettingsRepository,
+    intervalsAccount: IntervalsAccountStore,
+    private val uploads: IntervalsUploads,
 ) : ViewModel() {
     private val id: Long = checkNotNull(savedState.get<Long>("id"))
 
@@ -92,6 +100,13 @@ class RideDetailViewModel @Inject constructor(
             rides.ride(id)?.let { rides.recoverIfUnfinished(it) }
             _samples.value = rides.samples(id)
         }
+    }
+
+    val intervalsConnected: StateFlow<Boolean> = intervalsAccount.account.map { it != null }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun uploadToIntervals() {
+        viewModelScope.launch { uploads.enqueue(id) }
     }
 
     suspend fun fitBytes(): ByteArray? {
@@ -115,6 +130,7 @@ fun RideDetailScreen(onBack: () -> Unit, viewModel: RideDetailViewModel = hiltVi
     val ride by viewModel.ride.collectAsStateWithLifecycle()
     val samples by viewModel.samples.collectAsStateWithLifecycle()
     val maxHeartRate by viewModel.maxHeartRate.collectAsStateWithLifecycle()
+    val intervalsConnected by viewModel.intervalsConnected.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var confirmDelete by remember { mutableStateOf(false) }
@@ -179,6 +195,16 @@ fun RideDetailScreen(onBack: () -> Unit, viewModel: RideDetailViewModel = hiltVi
                     Button(onClick = exportFit, enabled = samples.isNotEmpty()) { Text("Export FIT file") }
                 }
             }
+
+            IntervalsUploadCard(
+                ride = r,
+                connected = intervalsConnected,
+                hasData = samples.isNotEmpty(),
+                onUpload = viewModel::uploadToIntervals,
+                onOpen = { activityId ->
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://intervals.icu/activities/$activityId")))
+                },
+            )
         }
     }
 
@@ -252,6 +278,54 @@ private fun stepColors(samples: List<RideSample>, ftp: Int): List<Color> {
         PowerZone.forFtpFraction(percent / 100.0).color().copy(alpha = 0.6f)
     }
     return samples.map { byStep.getValue(it.stepIndex) }
+}
+
+@Composable
+private fun IntervalsUploadCard(
+    ride: RideEntity,
+    connected: Boolean,
+    hasData: Boolean,
+    onUpload: () -> Unit,
+    onOpen: (String) -> Unit,
+) {
+    val state = ride.intervalsState?.let { runCatching { IntervalsUploadState.valueOf(it) }.getOrNull() }
+    if (state == null && !connected) return
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("intervals.icu", style = MaterialTheme.typography.titleMedium)
+            Text(
+                when (state) {
+                    null -> "Not uploaded."
+                    IntervalsUploadState.Pending -> "Upload queued – runs as soon as there is a network connection."
+                    IntervalsUploadState.Uploaded -> "Uploaded."
+                    IntervalsUploadState.Failed -> "Upload failed."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            ride.intervalsMessage?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (state == IntervalsUploadState.Failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val activityId = ride.intervalsActivityId
+                if (state == IntervalsUploadState.Uploaded && activityId != null) {
+                    Button(onClick = { onOpen(activityId) }) { Text("Open on intervals.icu") }
+                }
+                if (connected && (state == null || state == IntervalsUploadState.Failed)) {
+                    Button(onClick = onUpload, enabled = hasData) {
+                        Text(if (state == IntervalsUploadState.Failed) "Retry upload" else "Upload to intervals.icu")
+                    }
+                }
+            }
+            if (!connected && state == IntervalsUploadState.Failed) {
+                Text("Connect intervals.icu in Settings to upload.", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
 }
 
 @Composable

@@ -37,6 +37,12 @@ data class RideEntity(
     val plannedSessionId: String? = null,
     /** Ramp test ride (DB v5); excluded from the FTP check's "ended early" signal. */
     @ColumnInfo(defaultValue = "0") val isFtpTest: Boolean = false,
+    /** intervals.icu upload (DB v7): [app.blockwork.data.intervals.IntervalsUploadState] name, null = never queued. */
+    val intervalsState: String? = null,
+    /** intervals.icu activity id, e.g. "i55751783", when known. */
+    val intervalsActivityId: String? = null,
+    /** Last upload problem or note, shown on the ride screen. */
+    val intervalsMessage: String? = null,
 )
 
 @Entity(

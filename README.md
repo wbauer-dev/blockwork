@@ -37,16 +37,18 @@ An Android app for structured indoor cycling. It controls a smart trainer in **E
   - Blocks of build weeks followed by a recovery week, with an FTP test in week 1 and in every recovery week.
   - Progressive intervals and never two hard days in a row.
   - Plans can be exported and imported as JSON.
-- **History:** power and heart-rate charts with zones and FTP line, plus metrics (NP, IF, TSS, kJ). **FIT export** for manual upload to Strava, Garmin Connect, intervals.icu and others.
+- **History:** power and heart-rate charts with zones and FTP line, plus metrics (NP, IF, TSS, kJ). **FIT export** for manual upload to Strava, Garmin Connect and others. Insights: heart rate at a fixed power over time and the training intensity distribution (3-zone model, Polarization Index).
+- **intervals.icu upload (optional):** connect your personal API key and finished rides are uploaded automatically (with heart rate and RR intervals), or one by one from the ride screen.
 - **Simulation mode:** a simulated trainer and heart rate strap for trying the app without hardware.
 
 Tested with a Polar H9 and a Wahoo KICKR Core on Android 17.
 
 ## Privacy
 
-- The app has **no internet permission**. Rides, heart rate and settings stay on the phone.
+- The app uses the internet **only for the optional intervals.icu upload**, and only after you connect an API key. Without it, rides, heart rate and settings stay on the phone.
+- The API key is stored encrypted with a key from the Android Keystore.
 - App data is excluded from Android cloud backup and device transfer.
-- Data only leaves the phone when you export a FIT file or share a workout or plan yourself.
+- Otherwise data only leaves the phone when you export a FIT file or share a workout or plan yourself.
 
 ## Disclaimer
 

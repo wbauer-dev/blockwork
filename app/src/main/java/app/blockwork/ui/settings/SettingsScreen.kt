@@ -183,6 +183,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             }
             CueCard(settings, viewModel::setCues)
             AutoStartPauseCard(settings, viewModel::setAutoStart, viewModel::setAutoPause)
+            IntervalsCard(notify = ::notify)
             ThemeCard(settings.theme, viewModel::setTheme)
 
             Card(Modifier.fillMaxWidth()) {

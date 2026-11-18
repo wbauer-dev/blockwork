@@ -9,6 +9,7 @@ import app.blockwork.domain.training.RideRecorder
 import app.blockwork.domain.training.SessionPhase
 import app.blockwork.domain.training.SessionState
 import app.blockwork.domain.training.TrainingSession
+import app.blockwork.upload.IntervalsUploads
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -33,6 +34,7 @@ class TrainingController @Inject constructor(
     private val settings: SettingsRepository,
     private val recorder: RideRecorder,
     private val cuePlayer: CuePlayer,
+    private val uploads: IntervalsUploads,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     private val session = MutableStateFlow<TrainingSession?>(null)
@@ -67,6 +69,12 @@ class TrainingController @Inject constructor(
         session.value = s
         TrainingService.start(context)
         s.start()
+        // The summary is published only after the ride was saved, so the upload sees the final ride.
+        scope.launch {
+            val done = s.state.first { it.phase == SessionPhase.Finished && it.summary != null }
+            val rideId = done.rideId ?: return@launch
+            uploads.onRideFinished(rideId, done.summary!!.durationSec)
+        }
     }
 
     fun pause() = session.value?.pause()

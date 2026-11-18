@@ -17,12 +17,12 @@ An Android app for structured indoor cycling. It runs on a phone and controls a 
 | Trainer | Wahoo KICKR Core over FTMS, **ERG mode only** |
 | Cadence | Taken from the KICKR Core only (no separate sensor) |
 | Training plans | Rule-based generator, plus import of workouts and plans |
-| Export | FIT export through the share sheet; manual upload to Strava/Garmin/intervals.icu. Strava API dropped (access requires a subscription) – parked on branch `feature/strava-upload` |
+| Export | FIT export through the share sheet; optional automatic upload to intervals.icu (personal API key). Strava API dropped (access requires a subscription) – parked on branch `feature/strava-upload` |
 
 ### Out of scope (for now)
 - Slope/resistance simulation, virtual routes, multiplayer
 - ANT+, other trainers or sensors (the architecture still allows adding them)
-- Cloud accounts, sync or any network access
+- Cloud accounts, sync, or any network access beyond the optional intervals.icu upload
 - iOS, Wear OS
 
 ## 2. Tech stack
@@ -138,9 +138,10 @@ Import works through the Android file picker and "Open with / Share to app". Imp
 
 - Ride list and detail view: power/target and heart-rate charts, averages, normalized power, IF, TSS, average and max HR
 - **FIT export:** FileId, Activity, Session (sport cycling, sub-sport indoor cycling), one Lap per segment, Record messages at 1 Hz, shared through the Android share sheet
-- Upload to Strava, Garmin Connect or intervals.icu is done manually with the exported file
+- Upload to Strava or Garmin Connect is done manually with the exported file
+- **intervals.icu upload (opt-in):** personal API key (HTTP Basic, athlete id `0`), stored Keystore-encrypted. `POST /api/v1/athlete/0/activities` with the FIT file (incl. HRV/RR messages); 201 = created, 200 = duplicate (intervals.icu de-duplicates by file hash). Auto upload after each ride ≥ 5 min via WorkManager (network constraint, exponential backoff, gives up after 8 attempts); manual upload/retry on the ride screen. Status per ride in `rides.intervals*` (DB v7)
 - **Strava API: dropped** (API access requires a subscription). The implementation (OAuth, Keystore-encrypted tokens, upload with polling) is parked on branch `feature/strava-upload`
-- The app needs no network access
+- Network access is used only for intervals.icu
 
 ## 4. Phases & milestones
 
@@ -200,7 +201,7 @@ Import works through the Android file picker and "Open with / Share to app". Imp
 
 ## 6. Data protection
 
-- All ride and heart-rate data stays on the phone (the app has no network access). It only leaves the phone as a FIT file the user explicitly exports.
+- All ride and heart-rate data stays on the phone. It only leaves the phone as a FIT file the user explicitly exports, or as an upload to intervals.icu after the user connected their own API key (opt-in, can be disconnected anytime).
 - Heart-rate data is health data (Art. 9 GDPR). During development, use **simulated or synthetic data only** for tests, sample files and AI-assisted work, and never paste real ride recordings or HR exports into prompts.
 
 ## 7. Risks & open points

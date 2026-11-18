@@ -3,7 +3,9 @@ package app.blockwork.di
 import android.content.Context
 import app.blockwork.ble.BleHeartRateMonitor
 import app.blockwork.ble.BleScanner
+import app.blockwork.BuildConfig
 import app.blockwork.ble.BleSmartTrainer
+import app.blockwork.data.intervals.IntervalsClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -40,4 +42,8 @@ object AppModule {
     @Provides
     @Singleton
     fun scanner(@ApplicationContext context: Context) = BleScanner(context)
+
+    @Provides
+    @Singleton
+    fun intervalsClient() = IntervalsClient(userAgent = "Blockwork/${BuildConfig.VERSION_NAME} (Android)")
 }
