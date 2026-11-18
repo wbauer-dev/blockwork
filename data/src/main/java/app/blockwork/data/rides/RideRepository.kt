@@ -3,6 +3,7 @@ package app.blockwork.data.rides
 import app.blockwork.domain.plan.LinkedRide
 import app.blockwork.domain.training.FtpCheck
 import app.blockwork.domain.training.RideFingerprint
+import app.blockwork.domain.training.RideProfile
 import app.blockwork.domain.training.RideSample
 import app.blockwork.domain.training.RideStats
 import app.blockwork.domain.training.RideSummary
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -58,6 +60,23 @@ class RideRepository @Inject constructor(private val dao: RideDao) {
                 completed = ride.completed,
             )
         }
+
+    /** Finished rides never change, so their profiles are computed once per app run. */
+    private val profileCache = ConcurrentHashMap<Long, RideProfile>()
+
+    /**
+     * Profiles of all finished rides for the history analyses, oldest first. Reads the samples of
+     * rides not seen before; call off the main thread.
+     */
+    suspend fun profiles(zone: ZoneId = ZoneId.systemDefault()): List<RideProfile> {
+        val rides = dao.finishedRidesSince(0)
+        profileCache.keys.retainAll(rides.map { it.id }.toSet())
+        return rides.map { ride ->
+            profileCache.getOrPut(ride.id) {
+                RideProfile.of(samples(ride.id), Instant.ofEpochMilli(ride.startedAt).atZone(zone).toLocalDate(), ride.ftp)
+            }
+        }
+    }
 
     suspend fun delete(id: Long) = dao.deleteRide(id)
 

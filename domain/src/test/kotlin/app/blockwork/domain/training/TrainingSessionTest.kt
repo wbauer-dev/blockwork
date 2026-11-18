@@ -16,6 +16,7 @@ import kotlin.random.Random
 
 private class FakeRecorder : RideRecorder {
     val samples = mutableListOf<RideSample>()
+    val rr = mutableListOf<RrInterval>()
     var finished: Pair<RideSummary, Boolean>? = null
     var started: RideStart? = null
 
@@ -25,6 +26,7 @@ private class FakeRecorder : RideRecorder {
         return 1L
     }
     override suspend fun addSample(rideId: Long, sample: RideSample) { samples += sample }
+    override suspend fun addRrIntervals(rideId: Long, intervals: List<RrInterval>) { rr += intervals }
     override suspend fun finishRide(rideId: Long, summary: RideSummary, completed: Boolean) {
         finished = summary to completed
     }
@@ -113,6 +115,29 @@ class TrainingSessionTest {
         assertThat(rig.session.state.value.phase).isEqualTo(SessionPhase.Finished)
         assertThat(rig.recorder.finished!!.second).isFalse()
         assertThat(rig.recorder.samples).hasSize(5)
+    }
+
+    @Test fun recordsEveryRrIntervalWhileRunningOnly() = runTest {
+        val rig = Rig(this)
+        rig.trainer.connect("SIM")
+        rig.hr.connect("SIM")
+        rig.session.start()
+        advanceTimeBy(10_500)
+        rig.session.pause()
+        advanceTimeBy(10_000)
+        rig.session.resume()
+        advanceTimeBy(5_000)
+        rig.session.stop()
+        advanceTimeBy(2_000)
+
+        val rr = rig.recorder.rr
+        // The simulated strap sends one interval per second; none are recorded during the pause.
+        assertThat(rr.size).isAtLeast(13)
+        assertThat(rr.size).isAtMost(16)
+        assertThat(rr.map { it.index }).isEqualTo(rr.indices.toList())
+        assertThat(rr.map { it.elapsedSec }).isInOrder()
+        assertThat(rr.all { it.elapsedSec in 0..rig.recorder.samples.size }).isTrue()
+        assertThat(rr.all { it.rrMs in 300..2000 }).isTrue()
     }
 }
 

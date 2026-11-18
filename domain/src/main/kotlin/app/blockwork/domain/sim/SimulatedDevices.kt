@@ -13,8 +13,12 @@ import app.blockwork.domain.devices.TrainerCapabilities
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -144,17 +148,18 @@ class SimulatedHeartRateMonitor(
     private val _heartRate = MutableStateFlow<HeartRateSample?>(null)
     override val heartRate: StateFlow<HeartRateSample?> = _heartRate.asStateFlow()
 
+    private val _rrIntervals = MutableSharedFlow<List<Int>>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    override val rrIntervals: SharedFlow<List<Int>> = _rrIntervals.asSharedFlow()
+
     private var bpm = RESTING_BPM.toDouble()
 
     override fun tick() {
         val goal = RESTING_BPM + 0.35 * (powerSource() ?: 0)
         bpm += (goal - bpm) * 0.05 // ~20 s time constant
         val value = (bpm + random.nextDouble(-1.0, 1.0)).roundToInt()
-        _heartRate.value = HeartRateSample(
-            bpm = value,
-            rrIntervalsMs = listOf((60_000.0 / value).roundToInt()),
-            sensorContact = true,
-        )
+        val rr = listOf((60_000.0 / value).roundToInt())
+        _heartRate.value = HeartRateSample(bpm = value, rrIntervalsMs = rr, sensorContact = true)
+        _rrIntervals.tryEmit(rr)
     }
 
     override fun onDisconnected() {

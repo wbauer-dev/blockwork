@@ -34,6 +34,9 @@ interface RideDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSample(sample: RideSampleEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRrIntervals(intervals: List<RideRrIntervalEntity>)
+
     @Query("SELECT * FROM ride_samples WHERE rideId = :rideId ORDER BY elapsedSec")
     suspend fun samples(rideId: Long): List<RideSampleEntity>
 
@@ -43,13 +46,17 @@ interface RideDao {
     @Query("DELETE FROM ride_samples")
     suspend fun deleteAllSamples()
 
+    @Query("DELETE FROM ride_rr_intervals")
+    suspend fun deleteAllRrIntervals()
+
     @Query("DELETE FROM rides")
     suspend fun deleteAllRides()
 
-    /** Removes every ride and all recorded samples. */
+    /** Removes every ride and all recorded samples and RR intervals. */
     @Transaction
     suspend fun deleteAll() {
         deleteAllSamples()
+        deleteAllRrIntervals()
         deleteAllRides()
     }
 }

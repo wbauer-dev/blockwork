@@ -109,6 +109,9 @@ class TrainingSession(
     private val engine = WorkoutEngine(workout, ftp)
     private val mutex = Mutex()
     private val samples = ArrayList<RideSample>()
+    /** RR intervals received since the last tick, written with the next sample. */
+    private val pendingRr = ArrayList<RrInterval>()
+    private var rrCount = 0
     private val lastPowers = ArrayDeque<Int>()
 
     private var rideId: Long? = null
@@ -136,6 +139,9 @@ class TrainingSession(
                 updateTarget()
                 publish()
             }
+            val rrJob = launch {
+                heartRateMonitor.rrIntervals.collect { rr -> mutex.withLock { onRrIntervals(rr) } }
+            }
             val startMark = timeSource.markNow()
             var tickNo = 0L
             while (true) {
@@ -145,6 +151,7 @@ class TrainingSession(
                 val finished = mutex.withLock { onTick() }
                 if (finished) break
             }
+            rrJob.cancel()
             finish()
         }
     }
@@ -202,11 +209,25 @@ class TrainingSession(
             samples += sample
             rideId?.let { recorder.addSample(it, sample) }
         }
+        flushRrIntervals()
         handle(events)
         autoStartPause(bike)
         updateTarget()
         publish()
         return engine.phase == SessionPhase.Finished
+    }
+
+    /** Like the samples, RR intervals are kept only while the workout is running. */
+    private fun onRrIntervals(rr: List<Int>) {
+        if (engine.phase != SessionPhase.Running || rideId == null) return
+        for (ms in rr) pendingRr += RrInterval(rrCount++, engine.elapsedSec, ms)
+    }
+
+    private suspend fun flushRrIntervals() {
+        val id = rideId ?: return
+        if (pendingRr.isEmpty()) return
+        recorder.addRrIntervals(id, pendingRr.toList())
+        pendingRr.clear()
     }
 
     /** Starts the ride and the engine; the ride's start time is when the rider actually begins. */
@@ -282,6 +303,7 @@ class TrainingSession(
     private suspend fun finish() {
         withContext(NonCancellable) {
             mutex.withLock {
+                flushRrIntervals()
                 val s = RideStats.summarize(samples, ftp)
                 summary = s
                 rideId?.let { recorder.finishRide(it, s, engine.completed) }

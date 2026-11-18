@@ -101,6 +101,27 @@ object FtpCheck {
         isFtpTest: Boolean,
         completed: Boolean,
     ): RideFingerprint {
+        var hard = 0
+        var raised = 0
+        var lowered = 0
+        if (!isFtpTest) {
+            for (s in samples) {
+                val i = s.intensity ?: continue
+                val target = s.targetWatts ?: continue
+                if (target / i / ftp < HARD_FTP) continue
+                hard++
+                if (i > 1.001) raised++ else if (i < 0.999) lowered++
+            }
+        }
+        return RideFingerprint(date, ftp, isFtpTest, completed, steadyHrByPower(samples), hard, raised, lowered)
+    }
+
+    /**
+     * Steady-state heart rate per [POWER_BIN]-watt power bin (absolute watts): only steps with a
+     * constant target of at least [MIN_STEADY_STEP_SEC], without their first [SETTLE_SEC], and only
+     * seconds with power within [ON_TARGET] of the target.
+     */
+    fun steadyHrByPower(samples: List<RideSample>): Map<Int, HrBin> {
         val bins = HashMap<Int, HrBin>()
         // Runs of samples in the same step with the same target = steady segments.
         var start = 0
@@ -123,20 +144,7 @@ object FtpCheck {
             }
             start = end + 1
         }
-
-        var hard = 0
-        var raised = 0
-        var lowered = 0
-        if (!isFtpTest) {
-            for (s in samples) {
-                val i = s.intensity ?: continue
-                val target = s.targetWatts ?: continue
-                if (target / i / ftp < HARD_FTP) continue
-                hard++
-                if (i > 1.001) raised++ else if (i < 0.999) lowered++
-            }
-        }
-        return RideFingerprint(date, ftp, isFtpTest, completed, bins, hard, raised, lowered)
+        return bins
     }
 
     fun analyze(rides: List<RideFingerprint>, currentFtp: Int, maxHeartRate: Int?, today: LocalDate): FtpCheckResult {

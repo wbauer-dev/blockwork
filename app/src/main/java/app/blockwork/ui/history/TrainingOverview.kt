@@ -81,7 +81,7 @@ private fun ThisWeekCard(o: TrainingOverview) {
 }
 
 @Composable
-private fun Stat(value: String, label: String, sub: String?, modifier: Modifier = Modifier) {
+internal fun Stat(value: String, label: String, sub: String?, modifier: Modifier = Modifier) {
     Column(modifier) {
         Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
         Text(label, style = MaterialTheme.typography.labelMedium)
@@ -106,7 +106,7 @@ private enum class WeeklyMetric(val title: String) {
     }
 }
 
-private val WeekFormat = DateTimeFormatter.ofPattern("d MMM")
+internal val WeekFormat = DateTimeFormatter.ofPattern("d MMM")
 
 @Composable
 private fun WeeklyLoadCard(weeks: List<WeekLoad>) {
@@ -247,7 +247,7 @@ private fun FitnessCard(fitness: Fitness?, firstRide: LocalDate?, today: LocalDa
 }
 
 /** 9000 -> "2:30 h". */
-private fun formatHours(sec: Int): String {
+internal fun formatHours(sec: Int): String {
     val min = (sec + 30) / 60
     return "%d:%02d h".format(min / 60, min % 60)
 }

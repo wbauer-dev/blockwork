@@ -65,3 +65,26 @@ data class RideSampleEntity(
     /** Intensity setting (1.0 = as planned); null in rides recorded before DB v5. */
     val intensity: Double? = null,
 )
+
+/** Beat-to-beat (RR) intervals from the heart-rate strap (DB v6), raw and unfiltered. */
+@Entity(
+    tableName = "ride_rr_intervals",
+    primaryKeys = ["rideId", "idx"],
+    foreignKeys = [
+        ForeignKey(
+            entity = RideEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["rideId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("rideId")],
+)
+data class RideRrIntervalEntity(
+    val rideId: Long,
+    /** Arrival order within the ride. */
+    val idx: Int,
+    /** Ride running seconds completed when the interval arrived. */
+    val elapsedSec: Int,
+    val rrMs: Int,
+)

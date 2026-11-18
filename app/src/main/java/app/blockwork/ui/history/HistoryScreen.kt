@@ -38,14 +38,23 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.blockwork.data.rides.RideEntity
+import app.blockwork.data.SettingsRepository
 import app.blockwork.data.rides.RideRepository
 import app.blockwork.ui.common.formatDuration
 import app.blockwork.ui.common.plural
 import dagger.hilt.android.lifecycle.HiltViewModel
+import app.blockwork.domain.training.HeartRateAtPower
+import app.blockwork.domain.training.HrAtPowerResult
+import app.blockwork.domain.training.IntensityDistribution
+import app.blockwork.domain.training.IntensityDistributionResult
 import app.blockwork.domain.training.RideLoad
 import app.blockwork.domain.training.TrainingLoad
 import app.blockwork.domain.training.TrainingOverview
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
@@ -63,6 +72,7 @@ class HistoryViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: RideRepository,
     private val training: TrainingController,
+    settings: SettingsRepository,
 ) : ViewModel() {
     val rides = repository.rides.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -73,6 +83,28 @@ class HistoryViewModel @Inject constructor(
             TrainingLoad.overview(rides.mapNotNull { it.toLoad() }, today) to today
         }
         .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * Sample-based analyses over all finished rides; null while loading. Recomputed when rides
+     * change (each ride's samples are read only once, see [RideRepository.profiles]).
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val insights: StateFlow<HistoryInsights?> = combine(
+        repository.rides,
+        settings.settings.map { it.maxHeartRate }.distinctUntilChanged(),
+    ) { _, maxHeartRate -> maxHeartRate }
+        .mapLatest { maxHeartRate ->
+            val today = LocalDate.now()
+            val profiles = repository.profiles()
+            HistoryInsights(
+                distribution = IntensityDistribution.analyze(profiles, maxHeartRate, today),
+                hrAtPower = HeartRateAtPower.analyze(profiles, today),
+                hasMaxHeartRate = maxHeartRate != null,
+                today = today,
+            )
+        }
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Deleting while a workout records would remove the ride it is writing to. */
@@ -86,6 +118,13 @@ class HistoryViewModel @Inject constructor(
         }
     }
 }
+
+data class HistoryInsights(
+    val distribution: IntensityDistributionResult,
+    val hrAtPower: HrAtPowerResult?,
+    val hasMaxHeartRate: Boolean,
+    val today: LocalDate,
+)
 
 /** Finished rides with a duration count; interrupted ones are left out until recovered. */
 private fun RideEntity.toLoad(): RideLoad? {
@@ -102,6 +141,7 @@ fun formatRideDate(millis: Long): String =
 fun HistoryScreen(onBack: () -> Unit, onOpen: (Long) -> Unit, viewModel: HistoryViewModel = hiltViewModel()) {
     val rides by viewModel.rides.collectAsStateWithLifecycle()
     val overview by viewModel.overview.collectAsStateWithLifecycle()
+    val insights by viewModel.insights.collectAsStateWithLifecycle()
     var confirmDeleteAll by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
@@ -125,6 +165,10 @@ fun HistoryScreen(onBack: () -> Unit, onOpen: (Long) -> Unit, viewModel: History
             val o = overview
             if (rides.isNotEmpty() && o != null) {
                 item(key = "overview") { TrainingOverviewSection(o.first, o.second) }
+                insights?.let { i ->
+                    item(key = "hr-at-power") { HeartRateAtPowerCard(i.hrAtPower, i.today) }
+                    item(key = "intensity") { IntensityDistributionCard(i.distribution, i.hasMaxHeartRate) }
+                }
                 item(key = "rides-title") { Text("Rides", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 6.dp)) }
             }
             items(rides, key = { it.id }) { RideCard(it, onOpen) }
@@ -141,7 +185,8 @@ fun HistoryScreen(onBack: () -> Unit, onOpen: (Long) -> Unit, viewModel: History
                     if (running) {
                         "Finish or end the current workout first – its ride is still being recorded."
                     } else {
-                        "All rides and their recorded data (power, cadence, heart rate) are removed from this phone. " +
+                        "All rides and their recorded data (power, cadence, heart rate, beat-to-beat intervals) " +
+                            "are removed from this phone. " +
                             "Training plan sessions will show as not done. FIT files you already exported elsewhere " +
                             "are not affected. This cannot be undone."
                     },

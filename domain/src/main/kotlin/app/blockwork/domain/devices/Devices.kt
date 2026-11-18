@@ -2,6 +2,7 @@ package app.blockwork.domain.devices
 
 import app.blockwork.domain.BikeSample
 import app.blockwork.domain.HeartRateSample
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 enum class ConnectionState { Disconnected, Connecting, Connected }
@@ -50,6 +51,12 @@ interface SensorDevice {
 interface HeartRateMonitor : SensorDevice {
     /** Latest sample; null while disconnected. */
     val heartRate: StateFlow<HeartRateSample?>
+
+    /**
+     * RR intervals in milliseconds, one emission per notification that carries any, in arrival
+     * order. Unlike [heartRate] nothing is conflated, so beat-to-beat series stay complete.
+     */
+    val rrIntervals: SharedFlow<List<Int>>
 }
 
 data class PowerRange(val minWatts: Int, val maxWatts: Int, val incrementWatts: Int) {
