@@ -2,6 +2,7 @@ package app.blockwork.data.export
 
 import app.blockwork.domain.training.RideSample
 import app.blockwork.domain.training.RideStats
+import app.blockwork.domain.training.RrInterval
 import com.garmin.fit.Activity
 import com.garmin.fit.ActivityMesg
 import com.garmin.fit.BufferEncoder
@@ -11,6 +12,7 @@ import com.garmin.fit.EventMesg
 import com.garmin.fit.EventType
 import com.garmin.fit.File
 import com.garmin.fit.FileIdMesg
+import com.garmin.fit.HrvMesg
 import com.garmin.fit.Fit
 import com.garmin.fit.LapMesg
 import com.garmin.fit.LapTrigger
@@ -27,12 +29,17 @@ import kotlin.math.roundToInt
 /**
  * Writes a ride as a FIT activity file (indoor cycling): one record per second,
  * one lap per workout step, session summary. Accepted by Strava, Garmin Connect, intervals.icu.
+ * RR intervals go into HRV messages between the records, in arrival order, as Garmin devices
+ * write them (intervals.icu computes HRV metrics such as DFA α1 from them).
  */
 object FitExporter {
 
     data class RideInfo(val startedAtMillis: Long, val ftp: Int)
 
-    fun export(ride: RideInfo, samples: List<RideSample>): ByteArray {
+    /** RR values per HRV message, as written by Garmin devices. */
+    private const val RR_PER_MESSAGE = 5
+
+    fun export(ride: RideInfo, samples: List<RideSample>, rrIntervals: List<RrInterval> = emptyList()): ByteArray {
         require(samples.isNotEmpty()) { "Ride has no data" }
         val start = time(ride.startedAtMillis)
         val end = samples.last().timestampMillis
@@ -48,8 +55,20 @@ object FitExporter {
         }
         messages += event(start, EventType.START)
 
+        val rr = rrIntervals.sortedBy { it.index }
+        var nextRr = 0
+        /** Adds the RR intervals that arrived before ride second [beforeSec] (all remaining for null). */
+        fun addRrBefore(beforeSec: Int?) {
+            val from = nextRr
+            while (nextRr < rr.size && (beforeSec == null || rr[nextRr].elapsedSec < beforeSec)) nextRr++
+            for (chunk in rr.subList(from, nextRr).chunked(RR_PER_MESSAGE)) {
+                messages += HrvMesg().apply { chunk.forEachIndexed { i, r -> setTime(i, r.rrMs / 1000f) } }
+            }
+        }
+
+        addRrBefore(samples.first().elapsedSec)
         var distance = 0.0
-        for (s in samples) {
+        for ((i, s) in samples.withIndex()) {
             distance += (s.speedKmh ?: 0.0) / 3.6
             messages += RecordMesg().apply {
                 timestamp = time(s.timestampMillis)
@@ -59,6 +78,7 @@ object FitExporter {
                 s.speedKmh?.let { speed = (it / 3.6).toFloat() }
                 this.distance = distance.toFloat()
             }
+            addRrBefore(samples.getOrNull(i + 1)?.elapsedSec)
         }
 
         val laps = samples.splitBy { it.stepIndex }

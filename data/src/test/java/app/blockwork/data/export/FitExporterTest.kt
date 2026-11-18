@@ -1,6 +1,8 @@
 package app.blockwork.data.export
 
 import app.blockwork.domain.training.RideSample
+import app.blockwork.domain.training.RrInterval
+import com.garmin.fit.HrvMesg
 import com.garmin.fit.Decode
 import com.garmin.fit.LapMesg
 import com.garmin.fit.Mesg
@@ -62,6 +64,27 @@ class FitExporterTest {
         assertThat(session.avgPower).isEqualTo(200)
         assertThat(session.numLaps).isEqualTo(2)
         assertThat(session.maxHeartRate.toInt()).isEqualTo(132)
+        assertThat(messages.none { it.num == MesgNum.HRV }).isTrue()
+    }
+
+    @Test fun writesRrIntervalsAsHrvMessagesInArrivalOrder() {
+        // Synthetic: two intervals per ride second, the first two before the first record.
+        val rr = (0 until 240).map { i -> RrInterval(index = i, elapsedSec = i / 2, rrMs = 400 + i) }
+        val messages = decode(FitExporter.export(FitExporter.RideInfo(start, 250), samples, rr.shuffled()))
+
+        val hrv = messages.filter { it.num == MesgNum.HRV }.map { HrvMesg(it) }
+        val times = hrv.flatMap { m -> (0 until m.numTime).map { m.getTime(it).toDouble() } }
+        assertThat(times).hasSize(240)
+        times.forEachIndexed { i, t -> assertThat(t).isWithin(0.0005).of((400 + i) / 1000.0) }
+        assertThat(hrv.all { it.numTime <= 5 }).isTrue()
+
+        // Interleaved with the records by arrival time.
+        val firstRecord = messages.indexOfFirst { it.num == MesgNum.RECORD }
+        val beforeFirst = messages.subList(0, firstRecord).filter { it.num == MesgNum.HRV }.map { HrvMesg(it).numTime }
+        assertThat(beforeFirst).containsExactly(2)
+        val secondRecord = messages.withIndex().filter { it.value.num == MesgNum.RECORD }[1].index
+        val afterFirst = messages.subList(firstRecord, secondRecord).filter { it.num == MesgNum.HRV }.map { HrvMesg(it).numTime }
+        assertThat(afterFirst).containsExactly(2)
     }
 
     @Test fun handlesMissingSensors() {

@@ -97,7 +97,8 @@ class RideDetailViewModel @Inject constructor(
     suspend fun fitBytes(): ByteArray? {
         val r = ride.value ?: return null
         val s = samples.value.takeIf { it.isNotEmpty() } ?: return null
-        return withContext(Dispatchers.Default) { FitExporter.export(FitExporter.RideInfo(r.startedAt, r.ftp), s) }
+        val rr = rides.rrIntervals(r.id)
+        return withContext(Dispatchers.Default) { FitExporter.export(FitExporter.RideInfo(r.startedAt, r.ftp), s, rr) }
     }
 
     fun delete(onDeleted: () -> Unit) {

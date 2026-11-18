@@ -40,6 +40,9 @@ interface RideDao {
     @Query("SELECT * FROM ride_samples WHERE rideId = :rideId ORDER BY elapsedSec")
     suspend fun samples(rideId: Long): List<RideSampleEntity>
 
+    @Query("SELECT * FROM ride_rr_intervals WHERE rideId = :rideId ORDER BY idx")
+    suspend fun rrIntervals(rideId: Long): List<RideRrIntervalEntity>
+
     @Query("DELETE FROM rides WHERE id = :id")
     suspend fun deleteRide(id: Long)
 

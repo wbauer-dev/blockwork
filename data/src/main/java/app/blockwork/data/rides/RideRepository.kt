@@ -7,6 +7,7 @@ import app.blockwork.domain.training.RideProfile
 import app.blockwork.domain.training.RideSample
 import app.blockwork.domain.training.RideStats
 import app.blockwork.domain.training.RideSummary
+import app.blockwork.domain.training.RrInterval
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant
@@ -33,6 +34,8 @@ class RideRepository @Inject constructor(private val dao: RideDao) {
     suspend fun ride(id: Long): RideEntity? = dao.ride(id)
 
     suspend fun samples(id: Long): List<RideSample> = dao.samples(id).map { it.toDomain() }
+
+    suspend fun rrIntervals(id: Long): List<RrInterval> = dao.rrIntervals(id).map { RrInterval(it.idx, it.elapsedSec, it.rrMs) }
 
     /**
      * Rides interrupted by the app being killed have samples but no summary:
