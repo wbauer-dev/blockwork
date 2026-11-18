@@ -44,7 +44,7 @@ class IntervalsClient(
     /** POST /api/v1/athlete/0/activities: 201 = created, 200 = all duplicates. */
     fun uploadActivity(apiKey: String, fit: ByteArray, fileName: String, name: String, externalId: String): UploadResult {
         val query = mapOf("name" to name, "external_id" to externalId, "device_name" to "Blockwork")
-            .entries.joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, Charsets.UTF_8)}" }
+            .entries.joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, "UTF-8")}" }
         val boundary = "blockwork-" + UUID.randomUUID()
         val body = buildMultipart(boundary, fileName, fit)
         val response = try {
