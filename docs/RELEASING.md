@@ -15,7 +15,7 @@ The workflow then:
 1. Derives `versionName` 1.2.3 and `versionCode` 10203 (major × 10000 + minor × 100 + patch) from the tag.
 2. Runs the unit tests and builds the release APK with R8 shrinking, signed with the release key.
 3. Verifies the signature, and writes a SHA-256 checksum.
-4. Creates the GitHub release with `IndoorTrain-1.2.3.apk`, the `.sha256` file, the certificate fingerprint and generated release notes.
+4. Creates the GitHub release with `Blockwork-1.2.3.apk`, the `.sha256` file, the certificate fingerprint and generated release notes.
 
 Every push to `main` and every pull request runs [`ci.yml`](../.github/workflows/ci.yml): unit tests, lint and a debug APK, which is uploaded as a workflow artifact.
 

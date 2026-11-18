@@ -187,7 +187,7 @@ Import works through the Android file picker and "Open with / Share to app". Imp
 - Plan import/export (JSON)
 
 ### Phase 6 – Polish (done) / Play Store prep (deferred)
-- Done: settings for max heart rate (HR zone colours), workout cues (beeps, vibration, voice announcements 10 s before each interval), theme (system/light/dark); landscape training layout; getting-started card; "Open with IndoorTrain" / share-to-app import for workout and plan files
+- Done: settings for max heart rate (HR zone colours), workout cues (beeps, vibration, voice announcements 10 s before each interval), theme (system/light/dark); landscape training layout; getting-started card; "Open with Blockwork" / share-to-app import for workout and plan files
 - Done later: signed, R8-shrunk release APKs built by GitHub Actions (docs/RELEASING.md)
 - Not done: units (metric only)
 - Deferred – Play Store: privacy policy, Data Safety form (heart rate counts as **health data**), signing, crash reporting without personal data

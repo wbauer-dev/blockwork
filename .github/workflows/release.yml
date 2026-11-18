@@ -60,7 +60,7 @@ jobs:
       - name: Verify signature, checksum
         id: apk
         run: |
-          APK="IndoorTrain-${{ steps.version.outputs.name }}.apk"
+          APK="Blockwork-${{ steps.version.outputs.name }}.apk"
           cp app/build/outputs/apk/release/app-release.apk "$APK"
           APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
           "$APKSIGNER" verify --print-certs "$APK" | tee signer.txt
@@ -83,5 +83,5 @@ jobs:
           NOTES
           gh release create "$GITHUB_REF_NAME" \
             "${{ steps.apk.outputs.file }}" "${{ steps.apk.outputs.file }}.sha256" \
-            --title "IndoorTrain ${{ steps.version.outputs.name }}" \
+            --title "Blockwork ${{ steps.version.outputs.name }}" \
             --notes-file notes.md --generate-notes --verify-tag

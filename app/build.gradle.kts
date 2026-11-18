@@ -21,16 +21,16 @@ plugins {
 }
 
 android {
-    namespace = "app.indoortrain"
+    namespace = "app.blockwork"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "app.indoortrain"
+        applicationId = "app.blockwork"
         minSdk = 31
         targetSdk = 37
         versionCode = appVersionCode
         versionName = appVersionName
-        manifestPlaceholders["appLabel"] = "IndoorTrain"
+        manifestPlaceholders["appLabel"] = "Blockwork"
     }
 
     signingConfigs {
@@ -49,7 +49,7 @@ android {
             // Separate app id: a development build can be installed next to a release.
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            manifestPlaceholders["appLabel"] = "IndoorTrain Dev"
+            manifestPlaceholders["appLabel"] = "Blockwork Dev"
         }
         release {
             isMinifyEnabled = true

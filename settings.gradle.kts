@@ -20,6 +20,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "IndoorTrain"
+rootProject.name = "Blockwork"
 
 include(":app", ":domain", ":ble", ":data")

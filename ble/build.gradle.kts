@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "app.indoortrain.ble"
+    namespace = "app.blockwork.ble"
     compileSdk = 37
 
     defaultConfig {

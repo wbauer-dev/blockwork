@@ -1,6 +1,6 @@
-# Installing IndoorTrain on your phone
+# Installing Blockwork on your phone
 
-IndoorTrain is not in the Play Store. You install the APK file from the [GitHub releases](https://github.com/wbauer-dev/indoortrain/releases/latest) directly. This is called "sideloading".
+Blockwork is not in the Play Store. You install the APK file from the [GitHub releases](https://github.com/wbauer-dev/blockwork/releases/latest) directly. This is called "sideloading".
 
 **Requirements:**
 
@@ -9,8 +9,8 @@ IndoorTrain is not in the Play Store. You install the APK file from the [GitHub 
 
 ## 1. Download
 
-1. On your phone, open <https://github.com/wbauer-dev/indoortrain/releases/latest>.
-2. Under **Assets**, tap `IndoorTrain-x.y.z.apk`.
+1. On your phone, open <https://github.com/wbauer-dev/blockwork/releases/latest>.
+2. Under **Assets**, tap `Blockwork-x.y.z.apk`.
 3. Confirm the download if the browser asks. It may warn that the file can be harmful; that warning appears for every APK file.
 
 ## 2. Allow the installation
@@ -29,7 +29,7 @@ You can switch the permission off again after installing.
 
 1. Tap **Install**.
 2. **Google Play Protect** may say the app is unknown, because it isn't from the Play Store. Tap **More details → Install anyway**. If it offers to send the app for scanning, you can decline.
-3. Open **IndoorTrain**.
+3. Open **Blockwork**.
 
 ## 4. First start
 
@@ -49,8 +49,8 @@ Download the new APK from the releases page and install it the same way. Android
 Every release lists the **SHA-256 fingerprint of the signing certificate**, and includes a `.sha256` file with the checksum of the APK. To check the APK on a computer:
 
 ```bash
-sha256sum -c IndoorTrain-x.y.z.apk.sha256
-apksigner verify --print-certs IndoorTrain-x.y.z.apk   # compare the SHA-256 digest
+sha256sum -c Blockwork-x.y.z.apk.sha256
+apksigner verify --print-certs Blockwork-x.y.z.apk   # compare the SHA-256 digest
 ```
 
 ## Install from a computer (alternative)
@@ -59,12 +59,21 @@ apksigner verify --print-certs IndoorTrain-x.y.z.apk   # compare the SHA-256 dig
 2. Connect the phone by USB and run:
 
 ```bash
-adb install IndoorTrain-x.y.z.apk
+adb install Blockwork-x.y.z.apk
 ```
+
+## Coming from IndoorTrain
+
+The app used to be called IndoorTrain (`app.indoortrain`). Blockwork (`app.blockwork`) installs as a separate app and starts with no data. To bring your things over:
+
+- **Workouts and plans:** share them from IndoorTrain and open the files with Blockwork. Blockwork still imports the old IndoorTrain JSON files.
+- **Rides:** export each ride as a FIT file (History → ride → Export FIT) and keep those files. Ride history can't be imported into Blockwork.
+
+Once you've saved everything, uninstall IndoorTrain.
 
 ## Troubleshooting
 
-- **"App not installed" / "package conflicts with an existing package":** a version signed with a different key is already installed, for example a build you made yourself before the debug builds were renamed. Export rides you want to keep (History → ride → Export FIT), uninstall the old app, then install the release. Debug builds made now install separately as "IndoorTrain Dev".
+- **"App not installed" / "package conflicts with an existing package":** a version signed with a different key is already installed, for example a build you made yourself before the debug builds were renamed. Export rides you want to keep (History → ride → Export FIT), uninstall the old app, then install the release. Debug builds made now install separately as "Blockwork Dev".
 - **The trainer connects but doesn't change resistance:** close other apps that control the trainer, update the trainer firmware with the manufacturer's app, then try **Settings → ERG test**.
 - **No voice announcements:** install a voice in **Android settings → Text-to-speech output**. Announcements are in English.
 

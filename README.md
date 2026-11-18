@@ -1,7 +1,7 @@
-# IndoorTrain
+# Blockwork
 
-[![CI](https://github.com/wbauer-dev/indoortrain/actions/workflows/ci.yml/badge.svg)](https://github.com/wbauer-dev/indoortrain/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/wbauer-dev/indoortrain)](https://github.com/wbauer-dev/indoortrain/releases/latest)
+[![CI](https://github.com/wbauer-dev/blockwork/actions/workflows/ci.yml/badge.svg)](https://github.com/wbauer-dev/blockwork/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/wbauer-dev/blockwork)](https://github.com/wbauer-dev/blockwork/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 An Android app for structured indoor cycling. It controls a smart trainer in **ERG mode**, records a Bluetooth heart rate strap, and builds **rule-based training plans**. It works without an account or cloud, and all data stays on the phone.
@@ -30,7 +30,7 @@ An Android app for structured indoor cycling. It controls a smart trainer in **E
 - **Training screen:** 3-second power against target, interval countdown, next interval, heart rate (with zones), cadence, and a workout profile with your actual power drawn over it. Works in portrait and landscape.
 - **Cues:** beeps, vibration and optional voice announcements ("In 10 seconds: 4 minutes at 280 watts").
 - **Keeps running with the screen off:** foreground service with a notification (pause / skip).
-- **Workout library:** built-in workouts, an editor, and import of Zwift `.zwo`, `.erg`, `.mrc` and JSON files, including "Open with IndoorTrain".
+- **Workout library:** built-in workouts, an editor, and import of Zwift `.zwo`, `.erg`, `.mrc` and JSON files, including "Open with Blockwork".
 - **FTP ramp test** with an FTP estimate (75 % of best 1-minute power).
 - **Training plans:**
   - Goals: base endurance, FTP build, VO2max, general fitness, polarized (80/20). Length 4–12 weeks, 2–6 days per week.
@@ -50,7 +50,7 @@ Tested with a Polar H9 and a Wahoo KICKR Core on Android 17.
 
 ## Disclaimer
 
-IndoorTrain is a training tool, **not a medical device**. Heart rate values and zones are for training guidance only. Check with a doctor before starting intense training.
+Blockwork is a training tool, **not a medical device**. Heart rate values and zones are for training guidance only. Check with a doctor before starting intense training.
 
 ## Building from source
 
@@ -62,7 +62,7 @@ Requirements: JDK 21 or newer and the Android SDK with platform 37. Android Stud
 ./gradlew installDebug     # install on a USB-connected phone
 ```
 
-Debug builds install as **"IndoorTrain Dev"** (`app.indoortrain.debug`), next to a release install. Without hardware, switch on **Settings → Simulation mode**.
+Debug builds install as **"Blockwork Dev"** (`app.blockwork.debug`), next to a release install. Without hardware, switch on **Settings → Simulation mode**.
 
 ### Project structure
 

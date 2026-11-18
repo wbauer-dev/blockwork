@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <workout_file>
-    <author>IndoorTrain tests</author>
+    <author>Blockwork tests</author>
     <name>Over-Unders</name>
     <description>Synthetic test workout</description>
     <sportType>bike</sportType>

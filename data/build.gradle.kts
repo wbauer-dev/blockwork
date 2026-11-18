@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "app.indoortrain.data"
+    namespace = "app.blockwork.data"
     compileSdk = 37
 
     defaultConfig {

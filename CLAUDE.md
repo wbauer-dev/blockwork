@@ -1,4 +1,4 @@
-# IndoorTrain
+# Blockwork
 
 Android app for structured indoor cycling: Polar H9 (BLE Heart Rate Service) + Wahoo KICKR Core (FTMS, ERG mode only),
 interval workouts, rule-based plan generator, workout import, FIT export. No network access (no INTERNET permission). See [PLAN.md](PLAN.md) for scope and phases.
@@ -6,7 +6,7 @@ interval workouts, rule-based plan generator, workout import, FIT export. No net
 ## Build & test
 - `./gradlew test` – all JVM unit tests (domain + ble parsers)
 - `./gradlew assembleDebug` / `./gradlew installDebug` – build / install on the USB-connected phone
-  (debug app id `app.indoortrain.debug`, label "IndoorTrain Dev"; release id is `app.indoortrain`)
+  (debug app id `app.blockwork.debug`, label "Blockwork Dev"; release id is `app.blockwork`)
 - Releases: push a tag `vX.Y.Z` → GitHub Actions builds the signed, R8-shrunk APK (docs/RELEASING.md).
   The signing key lives in `~/.android-keys/` and GitHub secrets – never commit or print it.
 - Android SDK at `~/Android/Sdk`, Android Studio via snap. Gradle runs on JDK 25; bytecode target is Java 17.
