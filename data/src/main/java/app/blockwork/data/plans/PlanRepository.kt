@@ -20,7 +20,7 @@ class PlanRepository @Inject constructor(private val dao: PlanDao) {
     val activePlan: Flow<TrainingPlan?> = dao.observeActive().map { e ->
         e?.let {
             try {
-                PlanJson.decode(it.json, it.id, LocalDate.parse(it.startDate))
+                PlanJson.decode(it.json, it.id, LocalDate.parse(it.startDate), keepIds = true)
             } catch (ex: WorkoutImportException) {
                 Log.w("PlanRepository", "Stored plan unreadable", ex)
                 null
@@ -43,7 +43,7 @@ class PlanRepository @Inject constructor(private val dao: PlanDao) {
     suspend fun delete() = dao.deleteAll()
 
     private suspend fun save(plan: TrainingPlan) {
-        dao.replace(PlanEntity(plan.id, plan.startDate.toString(), PlanJson.encode(plan), System.currentTimeMillis()))
+        dao.replace(PlanEntity(plan.id, plan.startDate.toString(), PlanJson.encode(plan, includeIds = true), System.currentTimeMillis()))
     }
 
     private fun newId() = "plan-" + UUID.randomUUID().toString().take(8)

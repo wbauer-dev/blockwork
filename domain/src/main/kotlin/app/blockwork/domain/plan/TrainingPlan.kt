@@ -72,6 +72,9 @@ data class TrainingPlan(
     fun session(id: String): PlannedSession? = sessions.firstOrNull { it.id == id }
 
     companion object {
+        /** Upper bound for plan length (generator, import and rescheduling). */
+        const val MAX_WEEKS = 52
+
         fun mondayOf(date: LocalDate): LocalDate = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     }
 }

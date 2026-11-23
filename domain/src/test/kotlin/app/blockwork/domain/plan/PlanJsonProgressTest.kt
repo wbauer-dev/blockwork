@@ -44,6 +44,33 @@ class PlanJsonProgressTest {
         assertThat(copy.sessions.all { it.id.startsWith("new-") && it.workout.id == it.id }).isTrue()
     }
 
+    @Test fun exportCarriesNoIdsAndImportIgnoresStoredOnes() {
+        assertThat(PlanJson.encode(plan)).doesNotContain("\"id\"")
+        val stored = PlanJson.encode(plan, includeIds = true)
+        assertThat(stored).contains("\"id\":\"orig-w1-tue\"")
+        val imported = PlanJson.decode(stored, "new", LocalDate.of(2027, 3, 3))
+        assertThat(imported.sessions.all { it.id.startsWith("new-") }).isTrue()
+    }
+
+    @Test fun storedIdsRoundTrip() {
+        val stored = PlanJson.decode(PlanJson.encode(plan, includeIds = true), "orig", plan.startDate, keepIds = true)
+        assertThat(stored.sessions.map { Triple(it.id, stored.dateOf(it), it.type) })
+            .isEqualTo(plan.sessions.map { Triple(it.id, plan.dateOf(it), it.type) })
+        assertThat(stored.sessions.all { it.workout.id == it.id }).isTrue()
+    }
+
+    /** Plans stored before ids were persisted derive the same ids as before, so their rides stay linked. */
+    @Test fun storedPlanWithoutIdsKeepsDerivedIds() {
+        val old = PlanJson.decode(PlanJson.encode(plan), "orig", plan.startDate, keepIds = true)
+        assertThat(old.sessions.map { it.id }).isEqualTo(plan.sessions.map { it.id })
+    }
+
+    @Test fun rejectsDuplicateStoredIds() {
+        val dup = PlanJson.encode(plan, includeIds = true).replace("\"orig-w1-thu\"", "\"orig-w1-tue\"")
+        assertThat(assertThrows(WorkoutImportException::class.java) { PlanJson.decode(dup, "orig", plan.startDate, keepIds = true) })
+            .hasMessageThat().contains("duplicate")
+    }
+
     @Test fun legacyPlanFormatStillImports() {
         val legacy = PlanJson.encode(plan).replace("\"blockwork-plan\"", "\"indoortrain-plan\"")
         assertThat(legacy).contains("\"indoortrain-plan\"")
