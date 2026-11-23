@@ -54,9 +54,14 @@ class PlanJsonProgressTest {
 
     @Test fun storedIdsRoundTrip() {
         val stored = PlanJson.decode(PlanJson.encode(plan, includeIds = true), "orig", plan.startDate, keepIds = true)
-        assertThat(stored.sessions.map { Triple(it.id, stored.dateOf(it), it.type) })
-            .isEqualTo(plan.sessions.map { Triple(it.id, plan.dateOf(it), it.type) })
-        assertThat(stored.sessions.all { it.workout.id == it.id }).isTrue()
+        assertThat(stored).isEqualTo(plan)
+    }
+
+    /** A ramp test started from a stored plan must still offer the FTP estimate afterwards. */
+    @Test fun ftpTestFlagSurvivesRoundTrip() {
+        assertThat(plan.sessions.filter { it.workout.isFtpTest }.map { it.type }.distinct()).containsExactly(SessionType.FtpTest)
+        val copy = PlanJson.decode(PlanJson.encode(plan), "new", plan.startDate)
+        assertThat(copy.sessions.map { it.workout.isFtpTest }).isEqualTo(plan.sessions.map { it.workout.isFtpTest })
     }
 
     /** Plans stored before ids were persisted derive the same ids as before, so their rides stay linked. */

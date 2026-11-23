@@ -73,7 +73,10 @@ object PlanJson {
             val sessions = w.sessions.map { s ->
                 val day = enumOrFail<DayOfWeek>(s.day, "weekday")
                 val id = s.id?.takeIf { keepIds && it.isNotBlank() } ?: "$planId-w${index + 1}-${day.name.lowercase().take(3)}"
-                PlannedSession(id, index, day, enumOrFail(s.type, "session type"), WorkoutJson.fromFile(s.workout, id))
+                val type = enumOrFail<SessionType>(s.type, "session type")
+                // The workout format has no FTP test flag; the session type carries it.
+                val workout = WorkoutJson.fromFile(s.workout, id).let { if (type == SessionType.FtpTest) it.copy(isFtpTest = true) else it }
+                PlannedSession(id, index, day, type, workout)
             }
             if (sessions.map { it.day }.distinct().size != sessions.size) {
                 throw WorkoutImportException("Week ${index + 1} has two sessions on the same day")
