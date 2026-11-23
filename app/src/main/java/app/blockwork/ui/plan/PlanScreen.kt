@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -30,6 +31,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -54,6 +57,7 @@ import app.blockwork.data.rides.RideRepository
 import app.blockwork.domain.io.WorkoutImportException
 import app.blockwork.domain.io.WorkoutImporter
 import app.blockwork.domain.plan.LinkedRide
+import app.blockwork.domain.plan.PlanEditor
 import app.blockwork.domain.plan.PlanProgress
 import app.blockwork.domain.plan.SessionStatus
 import app.blockwork.domain.plan.TrainingPlan
@@ -102,6 +106,13 @@ class PlanViewModel @Inject constructor(
 
     fun exportText(plan: TrainingPlan): String = plans.export(plan)
 
+    val edits = PlanEdits(plans, viewModelScope)
+
+    fun shift(from: LocalDate, days: Int) {
+        val p = plan.value ?: return
+        edits.apply(p, PlanEditor.shift(p, from, days, LocalDate.now(), rides.value), "Sessions from ${from.dayLabel()} moved ${shiftLabel(days)}")
+    }
+
     fun delete() {
         viewModelScope.launch { plans.delete() }
     }
@@ -144,14 +155,22 @@ fun PlanScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { viewModel.import(it) }
     val today = remember { LocalDate.now() }
+    val notice by viewModel.edits.notice.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    var shifting by remember { mutableStateOf(false) }
+    PlanNoticeSnackbar(notice, snackbar, viewModel.edits)
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text("Training plan") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
                     plan?.let { p ->
+                        if (!today.isAfter(p.endDate)) {
+                            IconButton(onClick = { shifting = true }) { Icon(Icons.Default.EditCalendar, "Shift plan") }
+                        }
                         IconButton(onClick = {
                             val send = Intent(Intent.ACTION_SEND).setType("application/json")
                                 .putExtra(Intent.EXTRA_SUBJECT, "${p.name}.json")
@@ -191,6 +210,16 @@ fun PlanScreen(
             onDismissRequest = viewModel::dismissMessage,
             text = { Text(it) },
             confirmButton = { TextButton(onClick = viewModel::dismissMessage) { Text("OK") } },
+        )
+    }
+    val p = plan
+    if (shifting && p != null) {
+        ShiftPlanDialog(
+            plan = p,
+            rides = rides,
+            today = today,
+            onShift = { from, days -> shifting = false; viewModel.shift(from, days) },
+            onDismiss = { shifting = false },
         )
     }
     if (confirmDelete) {

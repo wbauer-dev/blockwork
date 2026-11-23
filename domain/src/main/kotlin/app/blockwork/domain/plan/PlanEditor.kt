@@ -36,7 +36,7 @@ sealed interface PlanEdit {
  * - Done sessions never move, and nothing moves to a day before `today`. Missed and partially ridden
  *   sessions can be moved.
  * - The plan grows when a session leaves its range: weeks are appended, or prepended with an earlier
- *   start Monday. It never shrinks, so emptied weeks at the end stay part of the plan.
+ *   start Monday. Weeks left empty at the end are dropped; the start Monday never moves later.
  */
 object PlanEditor {
 
@@ -64,8 +64,8 @@ object PlanEditor {
      * Moves every session on or after [from] that is not done by [days] (negative = earlier).
      *
      * Build/recovery labels of the weeks from [from] onwards move along by whole weeks ([days] / 7, rounded),
-     * so a one-week shift (e.g. a pause after illness) keeps the recovery week with its sessions; the
-     * vacated weeks keep their label. Shifts to earlier days leave the labels as they are.
+     * so a one-week shift (e.g. a pause after illness) keeps the recovery week with its sessions; weeks
+     * vacated by a later shift keep their label, and an earlier shift undoes a later one.
      */
     fun shift(plan: TrainingPlan, from: LocalDate, days: Int, today: LocalDate, rides: List<LinkedRide>): PlanEdit {
         if (days == 0) return PlanEdit.Ok(plan)
@@ -76,10 +76,10 @@ object PlanEditor {
         val staying = plan.sessions.filter { it.id !in targets }.associateBy { plan.dateOf(it) }
         targets.values.firstNotNullOfOrNull { staying[it] }?.let { return rejected(PlanEdit.Reason.DayTaken, it.id) }
 
-        val weekShift = (days / 7.0).roundToInt().coerceAtLeast(0)
+        val weekShift = (days / 7.0).roundToInt()
         val fromWeek = weeksBetween(plan.startDate, TrainingPlan.mondayOf(from))
         return rebuild(plan, targets) { old ->
-            if (weekShift > 0 && old >= fromWeek + weekShift) kindAt(plan, old - weekShift) else kindAt(plan, old)
+            if (weekShift != 0 && old >= fromWeek + weekShift) kindAt(plan, old - weekShift) else kindAt(plan, old)
         }
     }
 
@@ -91,7 +91,7 @@ object PlanEditor {
         val dated = plan.sessions.map { it to (newDates[it.id] ?: plan.dateOf(it)) }
         check(dated.map { it.second }.distinct().size == dated.size) { "Two sessions on the same day" }
         val start = minOf(plan.startDate, TrainingPlan.mondayOf(dated.minOf { it.second }))
-        val lastMonday = maxOf(TrainingPlan.mondayOf(plan.endDate), TrainingPlan.mondayOf(dated.maxOf { it.second }))
+        val lastMonday = TrainingPlan.mondayOf(dated.maxOf { it.second })
         val count = weeksBetween(start, lastMonday) + 1
         if (count > TrainingPlan.MAX_WEEKS) return rejected(PlanEdit.Reason.TooLong, null)
         val offset = weeksBetween(start, plan.startDate)

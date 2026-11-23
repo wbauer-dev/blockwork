@@ -28,6 +28,10 @@ interface PlanDao {
     @Insert
     suspend fun insert(plan: PlanEntity)
 
+    /** Rewrites a plan in place (id and createdAt stay); returns the number of rows changed. */
+    @Query("UPDATE plans SET startDate = :startDate, json = :json WHERE id = :id")
+    suspend fun update(id: String, startDate: String, json: String): Int
+
     @Transaction
     suspend fun replace(plan: PlanEntity) {
         deleteAll()

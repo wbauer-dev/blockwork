@@ -134,6 +134,8 @@ Import works through the Android file picker and "Open with / Share to app". Imp
 
 **Plan view:** a calendar or week list with "today's workout". Completed rides are linked to their planned session.
 
+**Rescheduling:** move a session to another day (or swap two), or shift every open session from a day on by days or weeks (e.g. a pause week); undo via snackbar. Done sessions stay put, nothing moves into the past; session ids stay stable so ride links survive.
+
 ### 3.6 History & export
 
 - Ride list and detail view: power/target and heart-rate charts, averages, normalized power, IF, TSS, average and max HR

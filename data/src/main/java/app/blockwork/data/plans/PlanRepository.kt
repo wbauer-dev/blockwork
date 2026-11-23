@@ -42,6 +42,13 @@ class PlanRepository @Inject constructor(private val dao: PlanDao) {
 
     suspend fun delete() = dao.deleteAll()
 
+    /**
+     * Stores an edited version of an existing plan (same id, e.g. from PlanEditor).
+     * Returns false if that plan is no longer stored, e.g. it was ended or replaced meanwhile.
+     */
+    suspend fun update(plan: TrainingPlan): Boolean =
+        dao.update(plan.id, plan.startDate.toString(), PlanJson.encode(plan, includeIds = true)) > 0
+
     private suspend fun save(plan: TrainingPlan) {
         dao.replace(PlanEntity(plan.id, plan.startDate.toString(), PlanJson.encode(plan, includeIds = true), System.currentTimeMillis()))
     }

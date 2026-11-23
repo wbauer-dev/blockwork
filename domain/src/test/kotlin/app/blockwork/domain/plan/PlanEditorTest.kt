@@ -110,13 +110,21 @@ class PlanEditorTest {
         assertThat(edited.endDate).isEqualTo(plan.endDate)
     }
 
-    @Test fun moveEmptyingLastWeekKeepsPlanLength() {
+    @Test fun moveEmptyingLastWeekShortensPlan() {
         // Both recovery-week sessions move into week 3 (Wed 2 Dec, Sun 6 Dec).
         val edited = PlanEditor.move(plan, "p-w4-tue", day(16), monday, emptyList())
             .ok().let { PlanEditor.move(it, "p-w4-thu", day(20), monday, emptyList()).ok() }
         assertConsistent(edited)
-        assertThat(edited.weeks).hasSize(4)
-        assertThat(edited.weeks[3].sessions).isEmpty()
+        assertThat(edited.weeks).hasSize(3)
+        assertThat(edited.endDate).isEqualTo(day(20))
+        assertThat(edited.weeks.map { it.kind }).isEqualTo(plan.weeks.take(3).map { it.kind })
+    }
+
+    @Test fun pauseAndBackRestoresPlan() {
+        val paused = PlanEditor.shift(plan, day(7), 7, today = day(5), rides = emptyList()).ok()
+        val back = PlanEditor.shift(paused, day(7), -7, today = day(5), rides = emptyList()).ok()
+        assertThat(back.dates()).isEqualTo(plan.dates())
+        assertThat(back.weeks.map { it.kind }).isEqualTo(plan.weeks.map { it.kind })
     }
 
     @Test fun swapExchangesDays() {

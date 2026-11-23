@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,11 +20,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -40,7 +45,9 @@ import app.blockwork.data.rides.RideRepository
 import app.blockwork.data.workouts.WorkoutRepository
 import app.blockwork.devices.DeviceManager
 import app.blockwork.domain.devices.ConnectionState
+import app.blockwork.domain.plan.PlanEditor
 import app.blockwork.domain.plan.PlanProgress
+import app.blockwork.domain.plan.PlannedSession
 import app.blockwork.domain.plan.SessionStatus
 import app.blockwork.domain.training.WorkoutMetrics
 import app.blockwork.training.TrainingController
@@ -72,6 +79,23 @@ class PlanSessionViewModel @Inject constructor(
     val userSettings = settings.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserSettings())
     private val _saved = MutableStateFlow(false)
     val saved = _saved.asStateFlow()
+    val edits = PlanEdits(plans, viewModelScope)
+
+    fun moveTo(day: LocalDate) {
+        val p = plan.value ?: return
+        val from = p.session(sessionId)?.let(p::dateOf) ?: return
+        edits.apply(p, PlanEditor.move(p, sessionId, day, LocalDate.now(), rides.value), moveLabel(from, day))
+    }
+
+    fun swapWith(other: PlannedSession) {
+        val p = plan.value ?: return
+        val to = p.dateOf(other)
+        edits.apply(
+            p,
+            PlanEditor.swap(p, sessionId, other.id, LocalDate.now(), rides.value),
+            "Swapped with ${other.workout.name} – now on ${to.dayLabel()}",
+        )
+    }
 
     val trainerConnected: Boolean
         get() = devices.trainerStatus.value.connection == ConnectionState.Connected
@@ -103,8 +127,13 @@ fun PlanSessionScreen(onBack: () -> Unit, onStarted: () -> Unit, viewModel: Plan
     val startWorkout = rememberWorkoutStarter({ viewModel.trainerConnected }) { viewModel.start(onStarted) }
     val session = plan?.session(viewModel.sessionId)
     val today = remember { LocalDate.now() }
+    val notice by viewModel.edits.notice.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    var rescheduling by remember { mutableStateOf(false) }
+    PlanNoticeSnackbar(notice, snackbar, viewModel.edits)
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text(session?.workout?.name ?: "Session", maxLines = 1) },
@@ -151,6 +180,23 @@ fun PlanSessionScreen(onBack: () -> Unit, onStarted: () -> Unit, viewModel: Plan
             OutlinedButton(onClick = viewModel::saveToLibrary, enabled = !saved, modifier = Modifier.fillMaxWidth()) {
                 Text(if (saved) "Saved to My workouts" else "Save to My workouts")
             }
+            if (status != SessionStatus.Done) {
+                OutlinedButton(onClick = { rescheduling = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.EditCalendar, null)
+                    Text(" Reschedule")
+                }
+            }
+        }
+        if (rescheduling) {
+            RescheduleSheet(
+                plan = p,
+                session = session,
+                rides = rides,
+                today = today,
+                onMove = { rescheduling = false; viewModel.moveTo(it) },
+                onSwap = { rescheduling = false; viewModel.swapWith(it) },
+                onDismiss = { rescheduling = false },
+            )
         }
     }
 }
